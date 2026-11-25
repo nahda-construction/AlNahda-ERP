@@ -174,6 +174,8 @@ def main():
     if any(p < 1 for p in args.pr) or (not args.once and not args.publish):
         parser.error("Positive PRs required; polling requires explicit --publish")
     root = args.repo.resolve(strict=True)
+    if git(root, "rev-parse", "--is-bare-repository").strip() != "true":
+        raise SystemExit("Runner requires its own trusted bare clone; do not use a development checkout")
     if git(root, "remote", "get-url", "origin").strip() not in REMOTE:
         raise SystemExit("Unexpected origin; refusing to run")
     actor = api("user").get("login")
@@ -186,18 +188,28 @@ def main():
             fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError:
             raise SystemExit("Another local runner is active")
+        failures = {}
         while True:
             failed = False
             for number in sorted(set(args.pr)):
+                if failures.get(number, 0) >= 3:
+                    continue
                 try:
                     print(f"PR #{number}: {review_one(root, number, actor, args.publish)}",
                           flush=True)
+                    failures[number] = 0
                 except (OSError, ValueError, RuntimeError, KeyError, TypeError,
                         subprocess.TimeoutExpired) as exc:
                     print(f"PR #{number}: BLOCKED ({type(exc).__name__}): {exc}", flush=True)
                     failed = True
+                    failures[number] = failures.get(number, 0) + 1
+                    if failures[number] >= 3:
+                        print(f"PR #{number}: suspended after 3 consecutive failures; "
+                              "inspect log before restarting runner", flush=True)
             if args.once:
                 return 1 if failed else 0
+            if all(failures.get(p, 0) >= 3 for p in args.pr):
+                return 1
             time.sleep(300 if failed else POLL_SECONDS)
 
 
