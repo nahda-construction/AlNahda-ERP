@@ -181,3 +181,58 @@ class AuditEvent(models.Model):
                 fields=("test_transaction", "event_type"), name="test_audit_source_event_unique",
             ),
         ]
+
+
+class IdempotencyRecord(models.Model):
+    class Operation(models.TextChoices):
+        CREATE_TEST_DRAFT = "CREATE_TEST_DRAFT", "Create test draft"
+
+    class Status(models.TextChoices):
+        IN_PROGRESS = "IN_PROGRESS", "In progress"
+        COMPLETED = "COMPLETED", "Completed"
+
+    actor = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
+    project = models.ForeignKey("projects.Project", on_delete=models.PROTECT)
+    operation = models.CharField(max_length=32, choices=Operation)
+    key = models.UUIDField()
+    payload_sha256 = models.CharField(max_length=64)
+    status = models.CharField(max_length=11, choices=Status, default=Status.IN_PROGRESS)
+    created_at = models.DateTimeField(default=timezone.now)
+    test_transaction = models.ForeignKey(
+        TestTransaction, on_delete=models.PROTECT, null=True, blank=True,
+    )
+    response_status = models.PositiveSmallIntegerField(null=True, blank=True)
+    response_body = models.JSONField(null=True, blank=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=("actor", "project", "operation", "key"),
+                name="uq_idem_actor_proj_op_key",
+            ),
+            models.UniqueConstraint(
+                fields=("test_transaction",),
+                condition=Q(status="COMPLETED"),
+                name="uq_idem_completed_transaction",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    Q(
+                        status="IN_PROGRESS",
+                        test_transaction__isnull=True,
+                        response_status__isnull=True,
+                        response_body__isnull=True,
+                    )
+                    | (
+                        Q(
+                            status="COMPLETED",
+                            test_transaction__isnull=False,
+                            response_status__isnull=False,
+                            response_body__isnull=False,
+                        )
+                        & ~Q(response_body=None)
+                    )
+                ),
+                name="idem_status_result_valid",
+            ),
+        ]

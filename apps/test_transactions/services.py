@@ -1,17 +1,20 @@
+import hashlib
+import json
 import uuid
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP, localcontext
 
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.core.validators import DecimalValidator
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.http import Http404
+from django.urls import reverse
 from django.utils import timezone
 
 from apps.access_control.policies import Action, is_internal_employee, projects_for
 from apps.projects.models import Project, WorkNode
 
 from . import storage
-from .models import Attachment, AuditEvent, TestTransaction, TestTransactionLine
+from .models import Attachment, AuditEvent, IdempotencyRecord, TestTransaction, TestTransactionLine
 
 
 MAX_LINES = 100
@@ -24,6 +27,10 @@ CENT = Decimal("0.01")
 
 
 class TransitionConflict(Exception):
+    pass
+
+
+class IdempotencyConflict(Exception):
     pass
 
 
@@ -139,29 +146,106 @@ def total_amount(lines):
         return sum((line.amount for line in lines), Decimal("0.00"))
 
 
-def create_draft(*, actor, project_id, title, lines, uploaded_file):
+def _prepare_draft(actor, project_id, title, lines):
+    project = require_project(actor, project_id, Action.CREATE_TEST_DRAFT, for_write=True)
+    return project.pk, _text(title, 160, required=True), _prepare_lines(project.pk, lines)
+
+
+def _save_prepared_draft(actor, project_id, title, lines, staged_file, storage_key):
     require_project(actor, project_id, Action.CREATE_TEST_DRAFT, for_write=True)
-    title = _text(title, 160, required=True)
-    lines = _prepare_lines(project_id, lines)
-    with storage.stage_pdf(uploaded_file) as staged_file:
-        key = storage.publish(staged_file)
-        with transaction.atomic():
-            require_project(actor, project_id, Action.CREATE_TEST_DRAFT, for_write=True)
-            _validate_nodes(project_id, {line.work_node_id for line in lines})
-            draft = TestTransaction.objects.create(project_id=project_id, title=title, created_by=actor)
-            for line in lines:
-                line.transaction = draft
-            TestTransactionLine.objects.bulk_create(lines)
-            Attachment.objects.create(
-                project_id=project_id, transaction=draft, storage_key=key,
-                original_name=staged_file.original_name, media_type=storage.PDF_MEDIA_TYPE,
-                size_bytes=staged_file.size_bytes, sha256=staged_file.sha256, uploaded_by=actor,
-            )
-            AuditEvent.objects.create(
-                project_id=project_id, actor=actor, test_transaction=draft,
-                event_type=AuditEvent.EventType.CREATED, next_state=TestTransaction.Status.DRAFT,
-            )
+    _validate_nodes(project_id, {line.work_node_id for line in lines})
+    draft = TestTransaction.objects.create(project_id=project_id, title=title, created_by=actor)
+    for line in lines:
+        line.transaction = draft
+    TestTransactionLine.objects.bulk_create(lines)
+    Attachment.objects.create(
+        project_id=project_id, transaction=draft, storage_key=storage_key,
+        original_name=staged_file.original_name, media_type=storage.PDF_MEDIA_TYPE,
+        size_bytes=staged_file.size_bytes, sha256=staged_file.sha256, uploaded_by=actor,
+    )
+    AuditEvent.objects.create(
+        project_id=project_id, actor=actor, test_transaction=draft,
+        event_type=AuditEvent.EventType.CREATED, next_state=TestTransaction.Status.DRAFT,
+    )
     return draft
+
+
+def _decimal_for_fingerprint(value):
+    if value.is_zero():
+        value = value.copy_abs()
+    return format(value, f".{INPUT_DECIMAL_PLACES}f")
+
+
+def _draft_fingerprint(project_id, title, lines, staged_file):
+    payload = {
+        "project_id": str(project_id),
+        "title": title,
+        "lines": [
+            {
+                "work_node": str(line.work_node_id),
+                "description": line.description,
+                "qty": _decimal_for_fingerprint(line.qty),
+                "unit_price": _decimal_for_fingerprint(line.unit_price),
+            }
+            for line in lines
+        ],
+        "attachment": {"sha256": staged_file.sha256, "original_name": staged_file.original_name},
+    }
+    canonical = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def _get_completed_record(*, actor_id, project_id, operation, key):
+    return IdempotencyRecord.objects.get(
+        actor_id=actor_id, project_id=project_id, operation=operation, key=key,
+        status=IdempotencyRecord.Status.COMPLETED,
+    )
+
+
+def create_draft_once(*, actor, project_id, key, title, lines, uploaded_file):
+    project_id, title, lines = _prepare_draft(actor, project_id, title, lines)
+    try:
+        key = uuid.UUID(str(key))
+    except ValueError as exc:
+        raise ValidationError("مفتاح الطلب غير صالح.") from exc
+    scope = {
+        "actor_id": actor.pk, "project_id": project_id,
+        "operation": IdempotencyRecord.Operation.CREATE_TEST_DRAFT, "key": key,
+    }
+    with storage.stage_pdf(uploaded_file) as staged_file:
+        fingerprint = _draft_fingerprint(project_id, title, lines, staged_file)
+        with transaction.atomic():
+            try:
+                with transaction.atomic():
+                    record = IdempotencyRecord.objects.create(**scope, payload_sha256=fingerprint)
+            except IntegrityError as exc:
+                cause = exc.__cause__
+                if (
+                    getattr(cause, "sqlstate", None) != "23505"
+                    or getattr(getattr(cause, "diag", None), "constraint_name", None)
+                    != "uq_idem_actor_proj_op_key"
+                ):
+                    raise
+                require_project(actor, project_id, Action.CREATE_TEST_DRAFT, for_write=True)
+                record = _get_completed_record(**scope)
+                if record.payload_sha256 != fingerprint:
+                    raise IdempotencyConflict("استُخدم مفتاح الطلب نفسه لبيانات مختلفة.") from None
+                return record
+
+            # The insert can also wait for a competing transaction that rolls back.
+            require_project(actor, project_id, Action.CREATE_TEST_DRAFT, for_write=True)
+            storage_key = storage.publish(staged_file)
+            draft = _save_prepared_draft(actor, project_id, title, lines, staged_file, storage_key)
+            record.test_transaction = draft
+            record.response_status = 303
+            record.response_body = {
+                "transaction_id": str(draft.pk),
+                "document_no": draft.document_no,
+                "location": reverse("test_transactions:detail", args=(project_id, draft.pk)),
+            }
+            record.status = IdempotencyRecord.Status.COMPLETED
+            record.save(update_fields=("test_transaction", "response_status", "response_body", "status"))
+            return record
 
 
 @transaction.atomic

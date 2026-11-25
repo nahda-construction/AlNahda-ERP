@@ -1,4 +1,5 @@
 from decimal import Decimal
+from uuid import uuid4
 
 from django import forms
 from django.contrib.auth.forms import AuthenticationForm
@@ -17,6 +18,7 @@ class EmployeeAuthenticationForm(AuthenticationForm):
 
 class TransactionForm(forms.Form):
     title = forms.CharField(label="عنوان المعاملة", max_length=160)
+    idempotency_key = forms.UUIDField(label="مفتاح الطلب", initial=uuid4, widget=forms.HiddenInput)
     attachment = forms.FileField(
         label="مرفق PDF اصطناعي (حتى 5 MiB)",
         widget=forms.ClearableFileInput(attrs={"accept": ".pdf,application/pdf"}),

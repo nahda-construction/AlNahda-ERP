@@ -64,7 +64,7 @@ def projects(request, project_id=None):
 
 
 POST_FIELDS = {
-    "csrfmiddlewaretoken", "title", "lines-TOTAL_FORMS", "lines-INITIAL_FORMS",
+    "csrfmiddlewaretoken", "title", "idempotency_key", "lines-TOTAL_FORMS", "lines-INITIAL_FORMS",
     "lines-MIN_NUM_FORMS", "lines-MAX_NUM_FORMS",
 }
 LINE_POST_FIELD = re.compile(r"lines-([0-9]{1,2})-(work_node|description|qty|unit_price|DELETE)")
@@ -117,16 +117,18 @@ def create_transaction(request, project_id):
         for line in line_forms.cleaned_data if line and not line["DELETE"]
     ]
     try:
-        draft = services.create_draft(
+        result = services.create_draft_once(
             actor=request.user, project_id=project_id, title=form.cleaned_data["title"],
-            lines=lines, uploaded_file=form.cleaned_data["attachment"],
+            key=form.cleaned_data["idempotency_key"], lines=lines, uploaded_file=form.cleaned_data["attachment"],
         )
     except ValidationError as exc:
         form.add_error(None, exc)
         return render(request, "test_transactions/transaction_form.html", context, status=400)
     except storage.PrivateStorageError:
         return HttpResponse("تعذّر حفظ المرفق الخاص.", status=503)
-    return redirect("test_transactions:detail", project_id=project_id, transaction_id=draft.pk)
+    except services.IdempotencyConflict as exc:
+        return HttpResponse(str(exc), status=409)
+    return HttpResponse(status=result.response_status, headers={"Location": result.response_body["location"]})
 
 
 @login_required
