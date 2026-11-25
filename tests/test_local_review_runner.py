@@ -119,7 +119,9 @@ class RunnerTests(unittest.TestCase):
              patch.object(runner, "run", return_value="review") as process:
             self.assertEqual(runner.review("test diff"), "review")
             args = process.call_args.args[0]
-            for value in ("--ignore-user-config", "--ephemeral", "read-only", "never",
+            for value in ("--ignore-user-config", "--ignore-rules", "--ephemeral", "read-only", "never",
+                          "features.apps=false", "features.hooks=false",
+                          "features.multi_agent=false", "features.memories=false",
                           "features.shell_tool=false", "mcp_servers={}",
                           'web_search="disabled"', 'forced_login_method="chatgpt"'):
                 self.assertIn(value, args)
