@@ -14,6 +14,7 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "apps.projects.apps.ProjectsConfig",
     "apps.contracts.apps.ContractsConfig",
+    "apps.access_control.apps.AccessControlConfig",
 ]
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
