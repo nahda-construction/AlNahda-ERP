@@ -4,6 +4,7 @@ from __future__ import annotations
 import importlib.util
 from pathlib import Path
 import unittest
+from unittest.mock import patch
 
 SCRIPT = Path(__file__).resolve().parents[1] / ".github" / "ci" / "pr_governance.py"
 SPEC = importlib.util.spec_from_file_location("pr_governance", SCRIPT)
@@ -128,6 +129,72 @@ class GovernanceTests(unittest.TestCase):
     def test_unclosed_fence_cannot_supply_rollback(self):
         text = body().replace("## Rollback\nRevert the PR commit if necessary.", "~~~\n## Rollback\nRevert the PR commit if necessary.")
         self.assertTrue(any("rollback" in issue for issue in gate.validate(text, ["README.md"])))
+
+    def test_literal_comment_in_fenced_log_preserves_visible_sections(self):
+        text = body().replace("Django CI and unit tests.",
+                              "Django CI and unit tests.\n~~~text\n<!-- literal log\n~~~")
+        self.assertEqual(gate.validate(text, ["README.md"]), [])
+
+    def test_fence_inside_comment_does_not_hide_missing_rollback(self):
+        text = body().replace("## Rollback\nRevert the PR commit if necessary.",
+                              "<!--\n~~~\n## Rollback\nFake evidence\n-->")
+        self.assertTrue(any("rollback" in issue for issue in gate.validate(text, ["README.md"])))
+
+    def test_fenced_comment_end_does_not_enable_fake_heading(self):
+        text = body().replace("## Rollback\nRevert the PR commit if necessary.",
+                              "~~~text\n<!--\n-->\n## Rollback\nFake\n~~~")
+        self.assertTrue(any("rollback" in issue for issue in gate.validate(text, ["README.md"])))
+
+
+class RevisionTests(unittest.TestCase):
+    def setUp(self):
+        self.event = {"number": 3, "head": {"sha": "a" * 40},
+                      "base": {"sha": "b" * 40}, "body": body()}
+        self.live = dict(self.event, changed_files=1, updated_at="2026-11-25T10:00:00Z")
+        self.files = [{"filename": "README.md", "status": "modified"}]
+
+    def fetch(self, *responses):
+        with patch.object(gate, "api_json", side_effect=responses):
+            return gate.changed_paths("owner/repo", "3", "test-token", self.event)
+
+    def test_stable_revision(self):
+        self.assertEqual(self.fetch(self.live, self.files, self.live), ["README.md"])
+
+    def test_head_changed_before_files(self):
+        with self.assertRaisesRegex(ValueError, "since event"):
+            self.fetch(dict(self.live, head={"sha": "c" * 40}))
+
+    def test_base_changed_before_files(self):
+        with self.assertRaisesRegex(ValueError, "since event"):
+            self.fetch(dict(self.live, base={"sha": "c" * 40}))
+
+    def test_description_changed_before_files(self):
+        with self.assertRaisesRegex(ValueError, "since event"):
+            self.fetch(dict(self.live, body="different"))
+
+    def test_head_changed_during_files(self):
+        with self.assertRaisesRegex(ValueError, "during file enumeration"):
+            self.fetch(self.live, self.files, dict(self.live, head={"sha": "c" * 40}))
+
+    def test_base_changed_during_files(self):
+        with self.assertRaisesRegex(ValueError, "during file enumeration"):
+            self.fetch(self.live, self.files, dict(self.live, base={"sha": "c" * 40}))
+
+    def test_description_changed_during_files(self):
+        with self.assertRaisesRegex(ValueError, "during file enumeration"):
+            self.fetch(self.live, self.files, dict(self.live, body="different"))
+
+    def test_metadata_timestamp_changed_during_files(self):
+        with self.assertRaisesRegex(ValueError, "during file enumeration"):
+            self.fetch(self.live, self.files, dict(self.live, updated_at="later"))
+
+    def test_incomplete_files(self):
+        with self.assertRaisesRegex(ValueError, "Incomplete"):
+            self.fetch(dict(self.live, changed_files=2), self.files)
+
+    def test_duplicate_files(self):
+        with self.assertRaisesRegex(ValueError, "duplicate"):
+            self.fetch(dict(self.live, changed_files=2), self.files * 2)
 
 
 if __name__ == "__main__":
