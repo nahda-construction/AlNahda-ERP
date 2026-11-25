@@ -14,7 +14,7 @@ State: proposed changes in PR #3; no main merge has been authorized. This docume
 - `.github/workflows/pr-governance.yml` uses **`pull_request_target`**, which reads the workflow from the trusted base branch (`main`).
 - It checks out **only `github.event.pull_request.base.sha`**, never the proposed PR revision, and executes only the base revision's `.github/ci/pr_governance.py`. Token permissions are read-only (`contents: read`, `pull-requests: read`); no PR code or artifacts are executed.
 - The trusted checker reads the PR changed-file metadata via GitHub's paginated files API. Both the previous and current file paths count for renamed files. Missing old paths or incomplete file lists fail closed.
-- It excludes full HTML comments and refuses missing visible risk-mitigation explanations and repeated required sections. Path classification is a heuristic warning, not proof of absence of business risk.
+- It excludes full HTML comments and fenced code examples from metadata parsing, and refuses missing visible risk-mitigation explanations, repeated required sections, or duplicate/conflicting declarations. Path-detected risks require `yes`; authors may also declare additional risks the heuristic misses. Path classification is a heuristic warning, not proof of absence of business risk.
 - `.github/workflows/governance-tests.yml` separately tests the proposed validator on ordinary `pull_request` events. **These unit tests are not the trusted governance check.**
 - A `pull_request_target` check ordinarily attaches to the **base** branch commit, not necessarily the PR head SHA. Merge preflight tooling must not rely on finding this check in the PR-head check-runs list. Until end-to-end evidence is in place, the operator must inspect the latest trusted workflow run for that PR.
 
@@ -36,6 +36,7 @@ The secure `pull_request_target` workflow is **new** and is not yet present on `
 - [x] PR #3 opened, original PostgreSQL/Django/secret CI passed.
 - [x] PR #3 had an advisory Codex review; it identified P1 and three P2 findings.
 - [x] Changes prepared to address trusted execution, rename handling, risk explanations and HTML comments.
+- [x] Second advisory review of `784c13b` reported three P2 findings; changes prepared for conservative risk declarations, unique flags and fenced code parsing.
 - [ ] The **updated** PR #3 regression and PostgreSQL CI runs pass, and fresh advisory review finds no blockers.
 - [ ] PR #3 is manually reviewed before merging; do not mistake old untrusted governance results for the secure gate.
 - [ ] A later PR demonstrates a real trusted `pull_request_target` run and rejection of invalid metadata.
