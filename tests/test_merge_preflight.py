@@ -24,7 +24,7 @@ def sample():
     }
     main = {"commit": {"sha": BASE}}
     checks = {
-        "total_count": 2,
+        "total_count": 3,
         "check_runs": [
             {
                 "id": idx, "name": name, "head_sha": HEAD,
