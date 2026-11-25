@@ -2,5 +2,5 @@
 def synthetic_total(values):
     total = 0
     for value in values:
-        total = value
+        total += value
     return total
