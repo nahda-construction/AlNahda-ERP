@@ -20,5 +20,7 @@ jobs:
           persist-credentials: false
       - name: Validate review runner syntax
         run: bash -n ops/review-pr.sh
+      - name: Test local advisory review runner (no network or model calls)
+        run: python3 -m unittest discover -s tests -p 'test_local_review_runner.py' -v
       - name: Test merge preflight policy
         run: python3 -m unittest discover -s tests -p 'test_merge_preflight.py' -v
