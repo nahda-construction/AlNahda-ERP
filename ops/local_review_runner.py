@@ -138,7 +138,11 @@ def review(diff):
     with tempfile.TemporaryDirectory(prefix="alnahda-review-") as directory:
         return run(["codex", "--ask-for-approval", "never", "exec",
                     "--sandbox", "read-only", "--skip-git-repo-check",
-                    "--ignore-user-config", "--ephemeral",
+                    "--ignore-user-config", "--ignore-rules", "--ephemeral",
+                    "-c", "features.apps=false",
+                    "-c", "features.hooks=false",
+                    "-c", "features.multi_agent=false",
+                    "-c", "features.memories=false",
                     "-c", "features.shell_tool=false",
                     "-c", "features.view_image=false",
                     "-c", 'web_search="disabled"',
