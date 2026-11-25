@@ -1,23 +1,33 @@
 # OPS-AUTO-02 — Local advisory review runner and merge preflight
 
-**Status:** Local runner pilot proposed on PR #5, per owner approval to prioritize automation. It is not yet installed or verified on Ubuntu. No change to ERP business requirements, main protection, reviewer identity, or merge authority.
+**Status:** Stage A (local, one-shot review-input preparation) proposed. Independent review of `f7e62605` found two P1 and five P2 issues. Live model execution, automated publication, and unattended polling are now blocked in code. This is not a completed automation system.
 
-## Local runner scope
+## Stage A — bounded local preparation
 
-- Install a reviewed, commit-pinned copy of `ops/local_review_runner.py` outside the development checkout, using a separate trusted bare clone. Never auto-update from a PR or execute the proposed application code.
-- Explicit PR-number allowlist enforced in code for the pilot: PR #3 and PR #5 only. Same-repository, non-draft, open PRs targeting main only. No arbitrary GitHub instructions or commands are interpreted.
-- Fetch exact head and base objects, verify both SHAs, and compute the diff without checking out PR files, external diff drivers or textconv. Cap the input at 180,000 bytes; oversized or empty diffs require manual scope review.
-- Invoke a fresh Codex CLI session from an empty temporary directory, using `exec`, read-only sandbox and no approval escalation. Send the diff as data via stdin. Ignore inherited user config, disable shell and image tools and web search, clear MCP server configuration, request ephemeral sessions, and pass only explicitly allowlisted runtime environment variables. Require ChatGPT login rather than API-key use. Unsupported flags fail closed; verify the installed CLI accepts the flags and that effective tool exposure is as expected. The user's existing Codex login remains necessary.
-- Compare the live revision and PR description digest before publishing. The report is advisory, includes its head/base/body digest, and is not a GitHub APPROVED review. The marker is used only for deduplication, not as trusted evidence or authorization.
-- Explicit `--publish` sends fenced, bounded advisory text to the same private PR through the operator's existing GitHub identity. Local-only mode uses `--once` without publish. Code fencing and prompt instructions are not a secret scanner.
-- One local runner at a time, 120-second polling, five-minute backoff and suspension after three consecutive failures per PR. It runs only while the local Ubuntu/WSL environment is running; no new subscription or cloud-hosted runner is required.
-- Never merge, approve, dispatch workflows, deploy, or run production tasks. A comment cannot trigger the execution of PR instructions. No self-hosted GitHub Actions runner is installed.
+- A reviewed pinned script outside the development checkout uses a dedicated bare clone, restricted to same-repository PR #3 and #5 targeting main. It fetches and verifies exact head/base SHAs; binds the local candidate filename to those SHAs and the PR body digest; and revalidates the revision before atomic private file creation.
+- Reads stdout and stderr as bytes with streaming caps, timeout and subprocess-group termination. Preserves raw diff bytes and provides an escaping helper for invalid UTF-8, CR and literal backslashes. Binary changes and oversized/empty diffs require separate scope review.
+- Explicit github.com API host; no PR comments or other write operations. Transient revision changes exit 75, independently of operational errors.
+- Per-file limit for git subprocesses, clone-size pre/post checks, free-space guard and local candidate retention cap. These are not a hard aggregate filesystem quota. No unattended fetch/polling until such a quota is enforced.
+- Only local one-shot preparation (`--once`) is supported. The compatibility wrapper prepares a local candidate instead of invoking Codex or publishing. No candidate is sent to any model. A local candidate is not a completed code review.
 
-## Bootstrap and safety
+## Stage B — required before unattended review
 
-The operator must install a pinned version after independent source review and CI. Do not execute unreviewed branch code. Pilot first with non-sensitive development-tooling diffs and verify Codex CLI flags, sandbox behavior, output and GitHub comment attribution on the actual machine. The read-only Codex sandbox and explicit tool settings do not by themselves prove isolation from local home/configuration, managed integrations, or other files. A dedicated restricted local account/profile or stronger OS isolation is required before expanding scope if the environment exposes secrets or additional tools. No raw credential output should be published; model-generated findings remain untrusted and must be reviewed.
+- Use a separately reviewed isolated worker with a pinned verified Codex executable/build, dedicated authentication/profile state, no host home or GitHub credentials, no session bus, no repository checkout, bounded resources, and enforced filesystem/network policy. Verify effective tool configuration and containment on actual WSL/Docker runtime. Merely accepting flags or using read-only sandbox does not establish confidentiality.
+- Validate approved review input scope and data-handling policy before any model transfer. Pilot with synthetic input first. Do not silently expand to real ERP data or source.
+- Keep raw generated review text private. Do not automatically publish raw text to GitHub. Any exact report to be published requires explicit review/approval under a defined policy; consider deterministic status-only publication for unattended operation, separately review its design and disclosure risks. Recheck current revision immediately before any future publication and account for residual API race and multiple publishers.
+- A hard quota for the dedicated fetch/candidate storage and a verified single publisher are required before unattended operation. No new paid subscription or self-hosted Actions runner.
 
-The compatibility wrapper `ops/review-pr.sh` uses the pinned installed runner under `~/.local/share/alnahda-review-runner/`; it does not execute a candidate worktree. The earlier worktree-based helper is superseded for future use.
+## Independent review disposition
+
+| Finding | Disposition |
+| --- | --- |
+| P1 model text publication | Publication removed; approval policy still required before any restoration. |
+| P1 model isolation | Model invocation removed; isolated worker not implemented/verified. |
+| P2 output/disk bounds | Streaming limits and per-file/size guards implemented; hard aggregate disk quota pending. |
+| P2 byte preservation/binary | Raw bytes preserved; binary diffs rejected; presentation escaping helper added. |
+| P2 stale report/multi-host | No publication; preparation checks revision; future publication race must be addressed. |
+| P2 GitHub host | API hostname pinned; no publication path. |
+| P2 normal revision churn | Dedicated retry outcome; not an operational failure. |
 
 ## Remaining merge controls (not resolved by this pilot)
 
@@ -31,4 +41,4 @@ Owner approved the following constraints: free Antigravity CLI only; advisory in
 
 ## Tests and rollback
 
-CI runs syntax checks and no-network mocked regression tests for the local runner and existing preflight. Actual Codex CLI, WSL runtime, credentials and comment publication require a controlled live pilot. Stop the local process to disable polling; delete the dedicated installation if desired. Before merge, close the PR; after merge, revert reviewed commits. No database migration or ERP posting is involved.
+CI runs syntax checks and no-network regression tests, including bounded local subprocess output. Actual isolated worker, WSL runtime, credentials and publication controls remain unverified. No background process is installed. Delete the dedicated preparation directory if desired. Before merge, close the PR; after merge, revert reviewed commits. No database migration or ERP posting is involved.
