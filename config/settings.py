@@ -12,6 +12,8 @@ INSTALLED_APPS = [
     "django.contrib.contenttypes",
     "django.contrib.auth",
     "django.contrib.sessions",
+    "apps.projects.apps.ProjectsConfig",
+    "apps.contracts.apps.ContractsConfig",
 ]
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",

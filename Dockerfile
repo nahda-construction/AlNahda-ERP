@@ -11,6 +11,7 @@ RUN pip install --no-cache-dir --requirement requirements.txt
 RUN useradd --system --uid 10001 --no-create-home erp
 COPY manage.py ./
 COPY config/ ./config/
+COPY apps/ ./apps/
 COPY tests/ ./tests/
 
 USER erp
