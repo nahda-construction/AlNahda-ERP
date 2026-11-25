@@ -131,9 +131,12 @@ def main(argv: list[str]) -> int:
             print(f"BLOCKED: {item}")
         print("No merge authorized. Branch protection is not enforced.")
         return 1
-    print("Preflight PASS: checks and distinct GitHub reviewer evidence verified.")
-    print("This does NOT enforce branch protection or execute a merge.")
-    return 0
+    # Temporary bootstrap interlock: a head-attached check is not trusted
+    # pull_request_target evidence. Do not emit PASS until the replacement
+    # verifier validates the trusted workflow, current ancestry and reviewer.
+    print("BLOCKED: trusted governance evidence verifier not implemented.")
+    print("No merge authorized. Branch protection is not enforced.")
+    return 1
 
 
 if __name__ == "__main__":
