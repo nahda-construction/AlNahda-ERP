@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>معاملة تجريبية جديدة</title>
+</head>
+<body>
+  <main>
+    <nav><a href="{% url 'test_transactions:project' project.id %}">{{ project.name }}</a></nav>
+    <h1>معاملة تجريبية جديدة</h1>
+    <form method="post" enctype="multipart/form-data">
+      {% csrf_token %}
+      {{ form.as_p }}
+      <fieldset>
+        <legend>سطور المعاملة</legend>
+        {{ line_forms.management_form }}
+        {{ line_forms.non_form_errors }}
+        <div id="transaction-lines">
+          {% for line in line_forms %}
+            <fieldset>{{ line.as_p }}</fieldset>
+          {% endfor %}
+        </div>
+        <template id="line-template"><fieldset>{{ line_forms.empty_form.as_p }}</fieldset></template>
+        <button type="button" id="add-line" data-max-lines="{{ max_lines }}">إضافة سطر</button>
+      </fieldset>
+      <button type="submit">حفظ المسودة</button>
+    </form>
+  </main>
+  <script>
+    const lineCount = document.getElementById('id_lines-TOTAL_FORMS');
+    const addLine = document.getElementById('add-line');
+    const lineTemplate = document.getElementById('line-template');
+    const lines = document.getElementById('transaction-lines');
+    const maxLines = Number(addLine.dataset.maxLines);
+
+    addLine.disabled = Number(lineCount.value) >= maxLines;
+    addLine.addEventListener('click', () => {
+      const index = Number(lineCount.value);
+      if (index >= maxLines) return;
+      lines.insertAdjacentHTML('beforeend', lineTemplate.innerHTML.replaceAll('__prefix__', index));
+      lineCount.value = index + 1;
+      addLine.disabled = index + 1 >= maxLines;
+    });
+  </script>
+</body>
+</html>
