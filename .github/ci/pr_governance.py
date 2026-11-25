@@ -34,17 +34,31 @@ def strip_html_comments(body: str) -> str:
     return re.sub(r"<!--.*?(?:-->|\Z)", "", body, flags=re.DOTALL)
 
 
-def parse_sections(body: str) -> dict[str, str]:
+def parse_sections(body: str) -> tuple[dict[str, str], list[str]]:
+    """Parse visible top-level headings and declarations outside fenced code."""
     sections: dict[str, list[str]] = {}
+    names: list[str] = []
     current: str | None = None
+    fence: tuple[str, int] | None = None
     for line in body.splitlines():
-        match = re.match(r"^##\s+(.+?)\s*$", line)
+        if fence is not None:
+            closing = re.fullmatch(r" {0,3}([`~]+)[ \t]*", line)
+            if closing and all(ch == fence[0] for ch in closing.group(1)) and len(closing.group(1)) >= fence[1]:
+                fence = None
+            continue
+        opening = re.match(r"^ {0,3}(`{3,}|~{3,})(.*)$", line)
+        if opening and (opening.group(1)[0] == "~" or "`" not in opening.group(2)):
+            marker = opening.group(1)
+            fence = (marker[0], len(marker))
+            continue
+        match = re.fullmatch(r" {0,3}##[ \t]+(.+?)[ \t]*", line)
         if match:
             current = match.group(1).strip().casefold()
+            names.append(current)
             sections.setdefault(current, []).append("")
         elif current is not None:
             sections[current].append(line)
-    return {heading: "\n".join(lines).strip() for heading, lines in sections.items()}
+    return {heading: "\n".join(lines).strip() for heading, lines in sections.items()}, names
 
 
 def paths_from_api_files(files: list[dict]) -> list[str]:
@@ -114,9 +128,7 @@ def expected_flags(paths: list[str]) -> dict[str, bool]:
 def validate(body: str, paths: list[str]) -> list[str]:
     issues: list[str] = []
     body = strip_html_comments(body)
-    sections = parse_sections(body)
-    names = [m.group(1).strip().casefold() for m in
-             re.finditer(r"(?m)^##\s+(.+?)\s*$", body)]
+    sections, names = parse_sections(body)
     for heading in HEADINGS:
         if names.count(heading) > 1:
             issues.append(f"Duplicate PR section: ## {heading}")
@@ -138,12 +150,19 @@ def validate(body: str, paths: list[str]) -> list[str]:
     risks = sections.get("risk and mitigations", "")
     expected = expected_flags(paths)
     for flag in FLAGS:
-        match = re.search(rf"(?mi)^{re.escape(flag)}:\s*(yes|no)\s*$", risks)
-        correct = "yes" if expected[flag] else "no"
-        if match is None:
-            issues.append(f"Risk declaration is missing: {flag}: {correct}")
-        elif match.group(1).casefold() != correct:
-            issues.append(f"Risk declaration mismatch: {flag} must be {correct}")
+        declarations = re.findall(
+            rf"(?mi)^[ \t]*{re.escape(flag)}[ \t]*:([^\r\n]*)$", risks
+        )
+        if not declarations:
+            issues.append(f"Risk declaration is missing: {flag}")
+        elif len(declarations) != 1:
+            issues.append(f"Duplicate risk declaration: {flag}")
+        else:
+            value = declarations[0].strip().casefold()
+            if value not in ("yes", "no"):
+                issues.append(f"Risk declaration must be yes or no: {flag}")
+            elif expected[flag] and value != "yes":
+                issues.append(f"Risk declaration mismatch: {flag} must be yes")
     return issues
 
 
