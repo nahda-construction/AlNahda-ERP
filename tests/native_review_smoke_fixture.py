@@ -3,4 +3,4 @@ def synthetic_total(values):
     total = 0
     for value in values:
         total += value
-    return total
+    return total + 1
