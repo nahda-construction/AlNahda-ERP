@@ -14,4 +14,4 @@ COPY config/ ./config/
 COPY tests/ ./tests/
 
 USER erp
-CMD ["gunicorn", "--bind", "0.0.0.0:8000", "--access-logfile", "-", "config.wsgi:application"]
+CMD ["gunicorn", "--no-control-socket", "--bind", "0.0.0.0:8000", "--access-logfile", "-", "config.wsgi:application"]

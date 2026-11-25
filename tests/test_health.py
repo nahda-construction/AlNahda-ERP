@@ -13,9 +13,10 @@ class HealthTests(TestCase):
 
 
 class UnavailableDatabaseTests(SimpleTestCase):
-    @patch("config.urls.connection.cursor", side_effect=OperationalError("private details"))
-    def test_database_failure_returns_a_generic_response(self, cursor):
+    @patch("config.urls.connection")
+    def test_database_failure_returns_a_generic_response(self, db_connection):
+        db_connection.cursor.side_effect = OperationalError("private details")
         response = self.client.get(reverse("healthz"))
         self.assertEqual(response.status_code, 503)
         self.assertEqual(response.json(), {"status": "unavailable"})
-        cursor.assert_called_once()
+        db_connection.cursor.assert_called_once_with()
