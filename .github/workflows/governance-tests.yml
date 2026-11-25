@@ -1,0 +1,23 @@
+name: Governance Unit Tests
+
+'on':
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+# This tests proposed code but is not the trusted governance gate.
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    name: Governance regression tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Run governance policy unit tests
+        run: python3 -m unittest discover -s tests -p 'test_pr_governance.py' -v
