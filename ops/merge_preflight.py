@@ -12,7 +12,7 @@ import subprocess
 import sys
 
 REPO = "nahda-construction/AlNahda-ERP"
-REQUIRED_CHECKS = ("PostgreSQL 18", "PR metadata and risk")
+REQUIRED_CHECKS = ("PostgreSQL 18", "PR metadata and risk", "Reviewer tooling")
 
 
 def get_json(endpoint: str) -> dict | list:
