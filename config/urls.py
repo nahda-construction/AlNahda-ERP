@@ -1,6 +1,6 @@
 from django.db import DatabaseError, connection
 from django.http import JsonResponse
-from django.urls import path
+from django.urls import include, path
 from django.views.decorators.http import require_safe
 
 
@@ -14,4 +14,7 @@ def healthz(request):
     return JsonResponse({"status": "ok"})
 
 
-urlpatterns = [path("healthz/", healthz, name="healthz")]
+urlpatterns = [
+    path("healthz/", healthz, name="healthz"),
+    path("employees/", include("apps.test_transactions.urls")),
+]

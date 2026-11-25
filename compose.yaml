@@ -21,9 +21,12 @@ services:
     environment:
       DJANGO_SECRET_KEY: ${ERP_DJANGO_SECRET_KEY:?Set ERP_DJANGO_SECRET_KEY in the external environment file}
       POSTGRES_DB: ${ERP_DB_NAME:?Set ERP_DB_NAME in the external environment file}
-      POSTGRES_USER: ${ERP_DB_USER:?Set ERP_DB_USER in the external environment file}
-      POSTGRES_PASSWORD: ${ERP_DB_PASSWORD:?Set ERP_DB_PASSWORD in the external environment file}
+      POSTGRES_USER: ${ERP_WEB_DB_USER:?Set ERP_WEB_DB_USER in the external environment file}
+      POSTGRES_PASSWORD: ${ERP_WEB_DB_PASSWORD:?Set ERP_WEB_DB_PASSWORD in the external environment file}
       POSTGRES_HOST: db
+      ERP_PRIVATE_ROOT: /var/lib/erp/private
+    volumes:
+      - privatefiles:/var/lib/erp/private
     ports:
       - "127.0.0.1:${ERP_WEB_PORT:?Set ERP_WEB_PORT in the external environment file}:8000"
     networks:
@@ -39,8 +42,25 @@ services:
       retries: 12
       start_period: 10s
 
+  migrate:
+    profiles: [maintenance]
+    build: .
+    command: ["python", "manage.py", "migrate", "--noinput"]
+    environment:
+      DJANGO_SECRET_KEY: ${ERP_DJANGO_SECRET_KEY:?Set ERP_DJANGO_SECRET_KEY in the external environment file}
+      POSTGRES_DB: ${ERP_DB_NAME:?Set ERP_DB_NAME in the external environment file}
+      POSTGRES_USER: ${ERP_DB_USER:?Set ERP_DB_USER in the external environment file}
+      POSTGRES_PASSWORD: ${ERP_DB_PASSWORD:?Set ERP_DB_PASSWORD in the external environment file}
+      POSTGRES_HOST: db
+    networks:
+      - database
+    depends_on:
+      db:
+        condition: service_healthy
+
 volumes:
   pgdata:
+  privatefiles:
 
 networks:
   frontend:

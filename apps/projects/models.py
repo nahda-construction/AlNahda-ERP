@@ -78,6 +78,9 @@ class WorkNode(models.Model):
             models.UniqueConstraint(
                 fields=("id", "project", "node_type"), name="worknode_parent_target_unique",
             ),
+            models.UniqueConstraint(
+                fields=("id", "project"), name="worknode_project_target_unique",
+            ),
             models.CheckConstraint(
                 condition=(
                     Q(node_type="SCOPE", parent__isnull=True, parent_type__isnull=True)

@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% if project %}{{ project.name }}{% else %}المشروعات{% endif %}</title>
+</head>
+<body>
+  <main>
+    <form method="post" action="{% url 'test_transactions:logout' %}">
+      {% csrf_token %}
+      <button type="submit">تسجيل الخروج</button>
+    </form>
+    {% if project %}
+      <nav><a href="{% url 'test_transactions:projects' %}">المشروعات</a></nav>
+      <h1>{{ project.name }}</h1>
+      {% if can_create %}
+        <p><a href="{% url 'test_transactions:create' project.id %}">إنشاء معاملة تجريبية</a></p>
+      {% endif %}
+      <h2>المعاملات التجريبية</h2>
+      <ul>
+        {% for draft in transactions %}
+          <li><a href="{% url 'test_transactions:detail' project.id draft.id %}">{{ draft.title }} <bdi>{{ draft.document_no }}</bdi></a></li>
+        {% empty %}
+          <li>لا توجد معاملات بعد.</li>
+        {% endfor %}
+      </ul>
+      {% if transactions.has_other_pages %}
+        <nav aria-label="صفحات المعاملات">
+          {% if transactions.has_previous %}<a href="?page={{ transactions.previous_page_number }}">السابقة</a>{% endif %}
+          {% if transactions.has_next %}<a href="?page={{ transactions.next_page_number }}">التالية</a>{% endif %}
+        </nav>
+      {% endif %}
+    {% else %}
+      <h1>المشروعات</h1>
+      <ul>
+        {% for item in projects %}
+          <li><a href="{% url 'test_transactions:project' item.id %}">{{ item.name }} <bdi>{{ item.code }}</bdi></a></li>
+        {% empty %}
+          <li>لا توجد مشروعات متاحة.</li>
+        {% endfor %}
+      </ul>
+    {% endif %}
+  </main>
+</body>
+</html>

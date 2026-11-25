@@ -9,6 +9,7 @@ COPY requirements.txt ./
 RUN pip install --no-cache-dir --requirement requirements.txt
 
 RUN useradd --system --uid 10001 --no-create-home erp
+RUN install -d -m 0700 -o erp -g erp /var/lib/erp/private
 COPY manage.py ./
 COPY config/ ./config/
 COPY apps/ ./apps/
