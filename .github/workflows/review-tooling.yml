@@ -22,6 +22,8 @@ jobs:
         run: bash -n ops/review-pr.sh && bash -n ops/review-worker/probe.sh && node --check ops/review-worker/probe.js
       - name: Test local advisory review runner (no network or model calls)
         run: python3 -m unittest discover -s tests -p 'test_local_review_runner.py' -v
+      - name: Test restricted egress policy (synthetic local sockets only)
+        run: python3 -m unittest discover -s tests -p 'test_egress_policy.py' -v
       - name: Test merge preflight policy
         run: python3 -m unittest discover -s tests -p 'test_merge_preflight.py' -v
 
