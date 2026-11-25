@@ -21,7 +21,7 @@ The compatibility wrapper `ops/review-pr.sh` uses the pinned installed runner un
 
 ## Remaining merge controls (not resolved by this pilot)
 
-- The existing merge preflight is not ready for use: trusted `pull_request_target` evidence is base-attached, not an ordinary head check. Require exact PR/head/base/body evidence from the trusted workflow and validate freshness, main ancestry and actual authorized reviewer identity. Do not use the current preflight PASS as merge authorization.
+- The existing merge preflight is not ready for use: trusted `pull_request_target` evidence is base-attached, not an ordinary head check. Require exact PR/head/base/body evidence from the trusted workflow and validate freshness, main ancestry and actual authorized reviewer identity. A temporary CLI interlock refuses to emit PASS until this verifier is implemented; legacy assessment unit tests alone are not merge authorization.
 - PR #3 is the trusted-gate bootstrap and cannot rely on a workflow not yet on main. Neither a Codex comment nor a second model is a separate GitHub APPROVED identity. No branch protection or automatic merge is enabled; no direct pushes to main.
 - Preserve FIN/SEC approval and all approved business decisions. No production data or credentials are permitted in review input.
 
