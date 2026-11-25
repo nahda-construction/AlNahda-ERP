@@ -29,6 +29,5 @@ jobs:
         env:
           PR_REPO: ${{ github.repository }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
-          PR_BODY: ${{ github.event.pull_request.body }}
           GH_TOKEN: ${{ github.token }}
         run: python3 .github/ci/pr_governance.py
