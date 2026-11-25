@@ -6,6 +6,7 @@ executed. A passing result is not independent review or branch protection.
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
@@ -29,17 +30,13 @@ FLAGS = (
 PLACEHOLDERS = {"", "todo", "tbd", "n/a", "none", "pending", "...", "-"}
 
 
-def strip_html_comments(body: str) -> str:
-    """Remove complete and unterminated HTML comments."""
-    return re.sub(r"<!--.*?(?:-->|\Z)", "", body, flags=re.DOTALL)
-
-
 def parse_sections(body: str) -> tuple[dict[str, str], list[str]]:
     """Parse visible top-level headings and declarations outside fenced code."""
     sections: dict[str, list[str]] = {}
     names: list[str] = []
     current: str | None = None
     fence: tuple[str, int] | None = None
+    in_comment = False
     for line in body.splitlines():
         if fence is not None:
             closing = re.fullmatch(r" {0,3}([`~]+)[ \t]*", line)
@@ -47,9 +44,29 @@ def parse_sections(body: str) -> tuple[dict[str, str], list[str]]:
                 fence = None
             continue
         opening = re.match(r"^ {0,3}(`{3,}|~{3,})(.*)$", line)
-        if opening and (opening.group(1)[0] == "~" or "`" not in opening.group(2)):
+        if not in_comment and opening and (opening.group(1)[0] == "~" or "`" not in opening.group(2)):
             marker = opening.group(1)
             fence = (marker[0], len(marker))
+            continue
+        # Comments inside fenced logs are literal, not Markdown comments.
+        # Do not join fragments across lines or accept hidden declarations.
+        if in_comment or "<!--" in line:
+            remainder = line
+            while remainder:
+                if in_comment:
+                    end = remainder.find("-->")
+                    if end < 0:
+                        break
+                    in_comment = False
+                    remainder = remainder[end + 3:]
+                else:
+                    start = remainder.find("<!--")
+                    if start < 0:
+                        break
+                    in_comment = True
+                    remainder = remainder[start + 4:]
+            # Ignore comment-bearing lines conservatively; visible metadata
+            # must be declared on its own line.
             continue
         match = re.fullmatch(r" {0,3}##[ \t]+(.+?)[ \t]*", line)
         if match:
@@ -79,33 +96,68 @@ def paths_from_api_files(files: list[dict]) -> list[str]:
     return paths
 
 
-def changed_paths(repo: str, pr_number: str, token: str) -> list[str]:
+def api_json(url: str, token: str):
+    req = request.Request(url, headers={
+        "Accept": "application/vnd.github+json",
+        "Authorization": f"Bearer {token}",
+        "X-GitHub-Api-Version": "2022-11-28",
+        "User-Agent": "AlNahda-ERP-PR-governance",
+    })
+    with request.urlopen(req, timeout=20) as response:
+        return json.load(response)
+
+
+def revision(pr: dict) -> tuple[str, str, str]:
+    """Bind the verdict to exact head/base SHAs and the description."""
+    try:
+        head, base = pr["head"]["sha"], pr["base"]["sha"]
+        body = pr["body"]
+    except (KeyError, TypeError) as exc:
+        raise ValueError("Malformed PR revision") from exc
+    if not all(isinstance(sha, str) and re.fullmatch(r"[0-9a-f]{40}", sha)
+               for sha in (head, base)):
+        raise ValueError("Malformed PR revision SHA")
+    if body is None:
+        body = ""
+    if not isinstance(body, str):
+        raise ValueError("Malformed PR body")
+    return head, base, body
+
+
+def changed_paths(repo: str, pr_number: str, token: str,
+                  event_pr: dict) -> list[str]:
     if not re.fullmatch(r"[a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+", repo):
         raise ValueError("Malformed repository name")
     if not pr_number.isdecimal() or int(pr_number) < 1:
         raise ValueError("Malformed PR number")
     if not token:
         raise ValueError("Missing read-only GitHub token")
+    if event_pr.get("number") != int(pr_number):
+        raise ValueError("PR number mismatch")
+    expected = revision(event_pr)
+    url = f"https://api.github.com/repos/{repo}/pulls/{int(pr_number)}"
+    before = api_json(url, token)
+    if revision(before) != expected:
+        raise ValueError("PR changed since event; require a fresh run")
+    count = before.get("changed_files")
+    if type(count) is not int or not 0 < count < 3000:
+        raise ValueError("Cannot verify complete changed-file count")
     all_files: list[dict] = []
     for page in range(1, 31):
-        url = (f"https://api.github.com/repos/{repo}/pulls/{int(pr_number)}"
-               f"/files?per_page=100&page={page}")
-        req = request.Request(url, headers={
-            "Accept": "application/vnd.github+json",
-            "Authorization": f"Bearer {token}",
-            "X-GitHub-Api-Version": "2022-11-28",
-            "User-Agent": "AlNahda-ERP-PR-governance",
-        })
-        with request.urlopen(req, timeout=20) as response:
-            batch = json.load(response)
+        batch = api_json(f"{url}/files?per_page=100&page={page}", token)
         if not isinstance(batch, list):
             raise ValueError("Malformed changed-files API response")
         all_files.extend(batch)
         if len(batch) < 100:
-            if not all_files:
-                raise ValueError("No changed files returned")
-            return paths_from_api_files(all_files)
-    raise ValueError("At least 3000 changed files: cannot verify complete list")
+            break
+    paths = paths_from_api_files(all_files)
+    if len(all_files) != count or len({item["filename"] for item in all_files}) != count:
+        raise ValueError("Incomplete or duplicate changed-file list")
+    after = api_json(url, token)
+    if (revision(after) != expected or after.get("changed_files") != count
+            or after.get("updated_at") != before.get("updated_at")):
+        raise ValueError("PR changed during file enumeration; require a fresh run")
+    return paths
 
 
 def expected_flags(paths: list[str]) -> dict[str, bool]:
@@ -127,7 +179,6 @@ def expected_flags(paths: list[str]) -> dict[str, bool]:
 
 def validate(body: str, paths: list[str]) -> list[str]:
     issues: list[str] = []
-    body = strip_html_comments(body)
     sections, names = parse_sections(body)
     for heading in HEADINGS:
         if names.count(heading) > 1:
@@ -168,21 +219,27 @@ def validate(body: str, paths: list[str]) -> list[str]:
 
 def main() -> int:
     try:
+        with open(os.environ["GITHUB_EVENT_PATH"], encoding="utf-8") as event_file:
+            event_pr = json.load(event_file)["pull_request"]
+        head, base, body = revision(event_pr)
+        number = os.getenv("PR_NUMBER", "")
         paths = changed_paths(
-            os.getenv("PR_REPO", ""),
-            os.getenv("PR_NUMBER", ""),
-            os.getenv("GH_TOKEN", ""),
+            os.getenv("PR_REPO", ""), number, os.getenv("GH_TOKEN", ""), event_pr,
         )
-    except (error.URLError, TimeoutError, OSError, ValueError, json.JSONDecodeError) as exc:
+        print("Verified PR revision:", json.dumps({
+            "pr": int(number), "head": head, "base": base,
+            "body_sha256": hashlib.sha256(body.encode("utf-8")).hexdigest(),
+        }, sort_keys=True))
+    except (error.URLError, TimeoutError, OSError, ValueError, KeyError, TypeError, AttributeError) as exc:
         print(f"Cannot classify PR changes: {exc}", file=sys.stderr)
         return 2
     print("Changed paths (including rename sources):")
     for path in paths:
-        print(f"  {path}")
+        print(f"  {json.dumps(path)}")
     print("Automatically classified risk flags:")
     for flag, value in expected_flags(paths).items():
         print(f"  {flag}: {'yes' if value else 'no'}")
-    errors = validate(os.getenv("PR_BODY", ""), paths)
+    errors = validate(body, paths)
     if errors:
         for issue in errors:
             print(f"ERROR: {issue}", file=sys.stderr)
