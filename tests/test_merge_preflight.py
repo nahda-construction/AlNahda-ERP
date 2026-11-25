@@ -4,6 +4,7 @@ from __future__ import annotations
 import importlib.util
 from pathlib import Path
 import unittest
+from unittest.mock import patch
 
 PATH = Path(__file__).resolve().parents[1] / "ops" / "merge_preflight.py"
 SPEC = importlib.util.spec_from_file_location("merge_preflight", PATH)
@@ -84,6 +85,12 @@ class PreflightTests(unittest.TestCase):
         pr, main, checks, reviews = sample()
         pr["body"] = "Financial-sensitive: yes"
         self.assertTrue(any("FIN sign-off" in m for m in gate.assess(pr, main, checks, reviews)))
+
+    def test_bootstrap_interlock_blocks_even_legacy_pass(self):
+        pr, main, checks, reviews = sample()
+        with patch.object(gate, "get_json", side_effect=[pr, main, checks]), \
+             patch.object(gate, "get_reviews", return_value=reviews):
+            self.assertEqual(gate.main(["merge_preflight.py", "3"]), 1)
 
 
 if __name__ == "__main__":
