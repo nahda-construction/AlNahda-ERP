@@ -1,0 +1,48 @@
+services:
+  db:
+    image: postgres:18
+    environment:
+      POSTGRES_DB: ${ERP_DB_NAME:?Set ERP_DB_NAME in the external environment file}
+      POSTGRES_USER: ${ERP_DB_USER:?Set ERP_DB_USER in the external environment file}
+      POSTGRES_PASSWORD: ${ERP_DB_PASSWORD:?Set ERP_DB_PASSWORD in the external environment file}
+    volumes:
+      - pgdata:/var/lib/postgresql
+    networks:
+      - database
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+      start_period: 5s
+
+  web:
+    build: .
+    environment:
+      DJANGO_SECRET_KEY: ${ERP_DJANGO_SECRET_KEY:?Set ERP_DJANGO_SECRET_KEY in the external environment file}
+      POSTGRES_DB: ${ERP_DB_NAME:?Set ERP_DB_NAME in the external environment file}
+      POSTGRES_USER: ${ERP_DB_USER:?Set ERP_DB_USER in the external environment file}
+      POSTGRES_PASSWORD: ${ERP_DB_PASSWORD:?Set ERP_DB_PASSWORD in the external environment file}
+      POSTGRES_HOST: db
+    ports:
+      - "127.0.0.1:${ERP_WEB_PORT:?Set ERP_WEB_PORT in the external environment file}:8000"
+    networks:
+      - frontend
+      - database
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/healthz/', timeout=4).close()"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+
+volumes:
+  pgdata:
+
+networks:
+  frontend:
+  database:
+    internal: true
