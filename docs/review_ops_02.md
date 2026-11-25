@@ -5,9 +5,9 @@
 ## Local runner scope
 
 - Install a reviewed, commit-pinned copy of `ops/local_review_runner.py` outside the development checkout, using a separate trusted bare clone. Never auto-update from a PR or execute the proposed application code.
-- Explicit PR-number allowlist, initially PR #3 and PR #5. Same-repository, non-draft, open PRs targeting main only. No arbitrary GitHub instructions or commands are interpreted.
+- Explicit PR-number allowlist enforced in code for the pilot: PR #3 and PR #5 only. Same-repository, non-draft, open PRs targeting main only. No arbitrary GitHub instructions or commands are interpreted.
 - Fetch exact head and base objects, verify both SHAs, and compute the diff without checking out PR files, external diff drivers or textconv. Cap the input at 180,000 bytes; oversized or empty diffs require manual scope review.
-- Invoke a fresh Codex CLI session from an empty temporary directory, using `exec`, read-only sandbox and no approval escalation. Send the diff as data via stdin. Strip GitHub token and SSH-agent variables from the model subprocess. The user's existing Codex login remains necessary.
+- Invoke a fresh Codex CLI session from an empty temporary directory, using `exec`, read-only sandbox and no approval escalation. Send the diff as data via stdin. Ignore inherited user config, disable shell and image tools and web search, clear MCP server configuration, request ephemeral sessions, and pass only explicitly allowlisted runtime environment variables. Require ChatGPT login rather than API-key use. Unsupported flags fail closed; verify the installed CLI accepts the flags and that effective tool exposure is as expected. The user's existing Codex login remains necessary.
 - Compare the live revision and PR description digest before publishing. The report is advisory, includes its head/base/body digest, and is not a GitHub APPROVED review. The marker is used only for deduplication, not as trusted evidence or authorization.
 - Explicit `--publish` sends fenced, bounded advisory text to the same private PR through the operator's existing GitHub identity. Local-only mode uses `--once` without publish. Code fencing and prompt instructions are not a secret scanner.
 - One local runner at a time, 120-second polling, five-minute backoff and suspension after three consecutive failures per PR. It runs only while the local Ubuntu/WSL environment is running; no new subscription or cloud-hosted runner is required.
@@ -15,7 +15,7 @@
 
 ## Bootstrap and safety
 
-The operator must install a pinned version after independent source review and CI. Do not execute unreviewed branch code. Pilot first with non-sensitive development-tooling diffs and verify Codex CLI flags, sandbox behavior, output and GitHub comment attribution on the actual machine. The read-only Codex sandbox does not by itself prove isolation from local home/configuration, MCP integrations, or other files. A dedicated restricted local account/profile or stronger OS isolation is required before expanding scope if the environment exposes secrets or additional tools. No raw credential output should be published; model-generated findings remain untrusted and must be reviewed.
+The operator must install a pinned version after independent source review and CI. Do not execute unreviewed branch code. Pilot first with non-sensitive development-tooling diffs and verify Codex CLI flags, sandbox behavior, output and GitHub comment attribution on the actual machine. The read-only Codex sandbox and explicit tool settings do not by themselves prove isolation from local home/configuration, managed integrations, or other files. A dedicated restricted local account/profile or stronger OS isolation is required before expanding scope if the environment exposes secrets or additional tools. No raw credential output should be published; model-generated findings remain untrusted and must be reviewed.
 
 The compatibility wrapper `ops/review-pr.sh` uses the pinned installed runner under `~/.local/share/alnahda-review-runner/`; it does not execute a candidate worktree. The earlier worktree-based helper is superseded for future use.
 
