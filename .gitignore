@@ -7,3 +7,19 @@ __pycache__/
 *.env.*
 !ops/env/*.env.example
 *.log
+
+# Local databases, private keys, and operational data.
+*.sqlite3
+*.sqlite3-*
+*.sqlite
+*.sqlite-*
+*.pem
+*.key
+*.p12
+*.pfx
+/backup.sql
+/*.dump
+/backups/
+/attachments/
+/exports/
+/data/
