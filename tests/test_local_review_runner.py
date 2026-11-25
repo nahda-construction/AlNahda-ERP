@@ -4,6 +4,7 @@ from __future__ import annotations
 import importlib.util
 from pathlib import Path
 import unittest
+import os
 from unittest.mock import patch
 
 PATH = Path(__file__).resolve().parents[1] / "ops" / "local_review_runner.py"
@@ -111,6 +112,29 @@ class RunnerTests(unittest.TestCase):
                                                      "x" * (runner.MAX_DIFF + 1)]):
             with self.assertRaisesRegex(ValueError, "oversized"):
                 runner.diff_for(Path("/tmp"), 3, runner.snapshot(pr(), 3))
+
+    def test_model_call_disables_tools_and_excludes_credentials(self):
+        with patch.dict(os.environ, {"GH_TOKEN": "fake-gh", "OPENAI_API_KEY": "fake-api",
+                                     "DB_PASSWORD": "fake-db", "PATH": "/usr/bin"}), \
+             patch.object(runner, "run", return_value="review") as process:
+            self.assertEqual(runner.review("test diff"), "review")
+            args = process.call_args.args[0]
+            for value in ("--ignore-user-config", "--ephemeral", "read-only", "never",
+                          "features.shell_tool=false", "mcp_servers={}",
+                          'web_search="disabled"', 'forced_login_method="chatgpt"'):
+                self.assertIn(value, args)
+            env = process.call_args.kwargs["env"]
+            for secret in ("GH_TOKEN", "OPENAI_API_KEY", "DB_PASSWORD"):
+                self.assertNotIn(secret, env)
+            self.assertIn("test diff", process.call_args.kwargs["input_text"])
+
+    def test_pilot_rejects_unapproved_pr_before_git_access(self):
+        with patch("sys.argv", ["runner", "--repo", "/tmp", "--pr", "99", "--once"]), \
+             patch.object(runner, "git") as git:
+            with self.assertRaises(SystemExit) as ctx:
+                runner.main()
+            self.assertEqual(ctx.exception.code, 2)
+            git.assert_not_called()
 
 
 if __name__ == "__main__":
