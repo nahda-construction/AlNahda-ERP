@@ -5,7 +5,7 @@ from decimal import Decimal, InvalidOperation, ROUND_HALF_UP, localcontext
 
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.core.validators import DecimalValidator
-from django.db import IntegrityError, transaction
+from django.db import IntegrityError, connection, transaction
 from django.http import Http404
 from django.urls import reverse
 from django.utils import timezone
@@ -31,6 +31,10 @@ class TransitionConflict(Exception):
 
 
 class IdempotencyConflict(Exception):
+    pass
+
+
+class AttachmentCleanupBusy(Exception):
     pass
 
 
@@ -246,6 +250,31 @@ def create_draft_once(*, actor, project_id, key, title, lines, uploaded_file):
             record.status = IdempotencyRecord.Status.COMPLETED
             record.save(update_fields=("test_transaction", "response_status", "response_body", "status"))
             return record
+
+
+@transaction.atomic(durable=True)
+def cleanup_orphaned_attachments():
+    with connection.cursor() as cursor:
+        cursor.execute("""
+            SELECT relowner = (SELECT oid FROM pg_catalog.pg_roles WHERE rolname = CURRENT_USER)
+            FROM pg_catalog.pg_class
+            WHERE oid = 'public.test_transactions_attachment'::regclass
+        """)
+        if not cursor.fetchone()[0]:
+            raise PermissionDenied("Attachment cleanup requires the maintenance role.")
+        cursor.execute("SELECT pg_catalog.pg_try_advisory_xact_lock(%s, %s)", storage.ATTACHMENT_STORAGE_LOCK)
+        if not cursor.fetchone()[0]:
+            raise AttachmentCleanupBusy("Attachment writes are still active.")
+
+        def is_referenced(key):
+            cursor.execute("""
+                SELECT EXISTS(
+                    SELECT 1 FROM public.test_transactions_attachment WHERE storage_key = %s
+                )
+            """, [key])
+            return cursor.fetchone()[0]
+
+        return storage._remove_unreferenced_files(is_referenced)
 
 
 @transaction.atomic

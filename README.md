@@ -26,8 +26,10 @@
 تستخدم الأوامر التالية بيئة التطوير واسم تشغيل اصطناعيًا. لتجهيز بيئة الاختبار غيّر ملف البيئة إلى `test.env` واسم المشروع إلى `erp-test`، واستخدم `erp_test_web` في أوامر SQL وملف الإعداد والمنفذ `8002` لفحص الصحة. عند الترقية أوقف `web` أولًا واحتفظ بوحدة PostgreSQL الحالية واسم القاعدة واعتماد مالكها. استخدم ملف المنح من نسخة الكود المطابقة للترحيلات.
 
 ```bash
+erp_compose_project=erp-dev
+erp_compose_env="$HOME/.config/alnahda-erp/dev.env"
 erp_compose() {
-  docker --context rootless compose -p erp-dev --env-file "$HOME/.config/alnahda-erp/dev.env" "$@"
+  docker --context rootless compose -p "$erp_compose_project" --env-file "$erp_compose_env" "$@"
 }
 erp_compose stop web
 erp_compose up -d --wait db
@@ -49,10 +51,15 @@ CREATE ROLE erp_dev_web LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NORE
 
 ```bash
 erp_compose run --rm --build migrate
-erp_compose exec -T db sh -ec '
-  export PGPASSWORD="$POSTGRES_PASSWORD"
-  exec psql -h 127.0.0.1 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v runtime_role="$1"
-' _ erp_dev_web < ops/postgres/s1_05_runtime_grants.sql
+erp_grants() {
+  erp_compose exec -T db sh -ec '
+    export PGPASSWORD="$POSTGRES_PASSWORD"
+    exec psql -h 127.0.0.1 -U "$POSTGRES_USER" -d "$POSTGRES_DB" \
+      -v ON_ERROR_STOP=1 -v runtime_role="$1" -v revoke_inventory_runtime="$2"
+  ' _ "$1" "${2:-off}"
+}
+erp_grants erp_dev_web < ops/postgres/s1_05_runtime_grants.sql
+erp_grants erp_dev_web < ops/postgres/s1_08_inventory_runtime_grants.sql
 erp_compose up -d --build --wait web
 curl --fail http://127.0.0.1:8001/healthz/
 ```
@@ -71,6 +78,42 @@ erp_compose run --rm -T migrate python manage.py shell -c "$erp_user_query"
 ```
 
 تستخدم كل بيئة وحدة مرفقات خاصة عند `/var/lib/erp/private` يملكها مستخدم تشغيل التطبيق. يمر تنزيل المرفق عبر مسار الموظفين المحمي. عند تشغيل Django خارج Compose، يحدد `ERP_PRIVATE_ROOT` مسارًا مطلقًا لمجلد خاص يملكه مستخدم التطبيق.
+
+### تنظيف المرفقات اليتيمة
+
+يُجري مشغّل الصيانة التنظيف من نافذة صيانة بعد تصريف عمليات الكتابة. أوقف `web` وأي عمليات كتابة أخرى على قاعدة البيئة، ثم تحقق من اسم وحدة ملفات مشروع Compose نفسه قبل تركيبها في جلسة الصيانة. يفترض المثال بيئة `erp-dev`. في بيئة الاختبار استخدم مشروع `erp-test` ووحدة `erp-test_privatefiles` وإعداداتهما.
+
+```bash
+erp_private_volume="${erp_compose_project}_privatefiles"
+erp_volume_labels='{{index .Labels "com.docker.compose.project"}}/{{index .Labels "com.docker.compose.volume"}}'
+erp_compose stop web &&
+erp_actual_labels=$(docker --context rootless volume inspect --format "$erp_volume_labels" "$erp_private_volume") &&
+test "$erp_actual_labels" = "$erp_compose_project/privatefiles" &&
+erp_compose run --rm -T --no-deps \
+  -v "$erp_private_volume:/var/lib/erp/private" \
+  -e ERP_PRIVATE_ROOT=/var/lib/erp/private \
+  migrate python manage.py shell -c '
+from apps.test_transactions.services import cleanup_orphaned_attachments
+result = cleanup_orphaned_attachments()
+print(result)
+if result.failures:
+    raise SystemExit(1)
+'
+```
+
+تتحقق الخدمة من هوية مالك جدول المرفقات، وتؤجل التشغيل عند تعذر أخذ قفل الصيانة. راجع مفاتيح الملفات التي فشل حذفها ورموز أخطائها، ثم أعد التنظيف بعد معالجة السبب. أعد تشغيل `web` بعد إكمال الصيانة.
+
+### الرجوع عن ترحيلات المخزون وإلغاء منحها
+
+نفّذ الرجوع المخبري في قاعدة اصطناعية. يتطلب الرجوع مع بيانات مخزون أو تدقيق مرتبطة خطة حفظ واستعادة معتمدة. أوقف الكتابة، ثم ألغِ منح S1-08 قبل إسقاط جداولها. تبدأ الترحيلات العكسية بمرجع التدقيق ثم المخزون.
+
+```bash
+erp_grants erp_dev_web on < ops/postgres/s1_08_inventory_runtime_grants.sql
+erp_compose run --rm -T migrate python manage.py migrate test_transactions 0003 --noinput
+erp_compose run --rm -T migrate python manage.py migrate inventory 0002 --noinput
+```
+
+تبقى منح ERP-02 سارية. لإعادة التطبيق نفّذ الترحيلات والمنح بالترتيب الوارد في إجراء التهيئة أو الترقية.
 
 ## إيقاف البيئة
 

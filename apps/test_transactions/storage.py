@@ -13,6 +13,7 @@ from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import UploadedFile
 from django.core.files.uploadhandler import FileUploadHandler, StopUpload
+from django.db import connection
 
 
 MAX_PDF_BYTES = 5 * 1024 * 1024
@@ -20,6 +21,7 @@ PDF_MEDIA_TYPE = "application/pdf"
 PDF_SIGNATURE = b"%PDF-"
 STORAGE_KEY = re.compile(r"[0-9a-f]{32}\.pdf")
 DIRECTORY_FLAGS = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+ATTACHMENT_STORAGE_LOCK = (1708, 1)
 
 
 class PrivateStorageError(Exception):
@@ -185,6 +187,11 @@ def stage_pdf(uploaded_file):
 
 
 def publish(staged_file):
+    if not connection.in_atomic_block:
+        raise PrivateStorageError("Installing a private attachment requires a transaction.")
+    # PostgreSQL retains the lock after a successful savepoint until the outer commit.
+    with connection.cursor() as cursor:
+        cursor.execute("SELECT pg_catalog.pg_advisory_xact_lock_shared(%s, %s)", ATTACHMENT_STORAGE_LOCK)
     key = f"{uuid.uuid4().hex}.pdf"
     temporary = staged_file.temporary
     try:
@@ -198,6 +205,38 @@ def publish(staged_file):
     except OSError as exc:
         raise PrivateStorageError("Installing the private attachment failed.") from exc
     return key
+
+
+@dataclass(frozen=True)
+class AttachmentCleanupResult:
+    removed: tuple[str, ...]
+    failures: tuple[tuple[str, int | None], ...]
+
+
+def _remove_unreferenced_files(is_referenced):
+    removed = []
+    failures = []
+    with _private_root() as root_fd:
+        for key in sorted(os.listdir(root_fd)):
+            if not STORAGE_KEY.fullmatch(key):
+                continue
+            try:
+                info = os.stat(key, dir_fd=root_fd, follow_symlinks=False)
+                if (
+                    not stat.S_ISREG(info.st_mode)
+                    or info.st_uid != os.geteuid()
+                    or stat.S_IMODE(info.st_mode) & 0o077
+                    or is_referenced(key)
+                ):
+                    continue
+                os.unlink(key, dir_fd=root_fd)
+            except FileNotFoundError:
+                continue
+            except OSError as exc:
+                failures.append((key, exc.errno))
+            else:
+                removed.append(key)
+    return AttachmentCleanupResult(tuple(removed), tuple(failures))
 
 
 def open_private_file(key):
