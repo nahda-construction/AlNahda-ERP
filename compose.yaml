@@ -30,6 +30,8 @@ services:
       POSTGRES_HOST: db
       ERP_PRIVATE_ROOT: /var/lib/erp/private
       ERP_PRINT_URL: http://printer:8010/render
+      ERP_INTERNAL_HOSTS: ${ERP_INTERNAL_HOSTS:-localhost,127.0.0.1}
+      ERP_OWNER_HOSTS: ${ERP_OWNER_HOSTS:-owner.localhost}
       GUNICORN_CMD_ARGS: --workers ${ERP_WEB_WORKERS:-2} --timeout 45
     volumes:
       - privatefiles:/var/lib/erp/private
@@ -43,7 +45,16 @@ services:
       db:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/healthz/', timeout=4).close()"]
+      test:
+        - CMD
+        - python
+        - -c
+        - |
+          import os
+          from urllib.request import Request, urlopen
+          host = next(value.strip() for value in os.environ["ERP_INTERNAL_HOSTS"].split(",") if value.strip())
+          request = Request("http://127.0.0.1:8000/healthz/", headers={"Host": host})
+          urlopen(request, timeout=4).close()
       interval: 5s
       timeout: 5s
       retries: 12
