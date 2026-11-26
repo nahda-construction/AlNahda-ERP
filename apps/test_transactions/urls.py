@@ -17,6 +17,8 @@ urlpatterns = [
     path("projects/<uuid:project_id>/transactions/new/", views.create_transaction, name="create"),
     path("projects/<uuid:project_id>/transactions/<uuid:transaction_id>/",
          views.transaction_detail, name="detail"),
+    path("projects/<uuid:project_id>/transactions/<uuid:transaction_id>/print/",
+         views.print_transaction, name="print"),
     path("projects/<uuid:project_id>/transactions/<uuid:transaction_id>/approve/",
          views.approve_transaction, name="approve"),
     path("projects/<uuid:project_id>/transactions/<uuid:transaction_id>/attachments/<uuid:attachment_id>/",

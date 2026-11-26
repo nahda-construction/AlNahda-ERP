@@ -72,3 +72,20 @@ jobs:
           python manage.py migrate --check
       - name: Run Django tests
         run: python manage.py test
+
+  printer-cgroup:
+    name: S1-10 printer cgroup acceptance
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Install PDF inspection tools if needed
+        run: |
+          if ! command -v pdftotext >/dev/null; then
+            sudo apt-get update
+            sudo apt-get install -y --no-install-recommends poppler-utils
+          fi
+      - name: Verify printer cgroup OOM and recovery
+        run: bash tests/run_s1_10_cgroup_acceptance.sh

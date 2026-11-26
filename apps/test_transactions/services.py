@@ -7,10 +7,12 @@ from django.core.exceptions import PermissionDenied, ValidationError
 from django.core.validators import DecimalValidator
 from django.db import IntegrityError, connection, transaction
 from django.http import Http404
+from django.template.loader import render_to_string
 from django.urls import reverse
 from django.utils import timezone
 
 from apps.access_control.policies import Action, is_internal_employee, projects_for
+from apps.printing import client as print_client
 from apps.projects.models import Project, WorkNode
 
 from . import storage
@@ -24,6 +26,7 @@ UNIT_PRICE_DIGITS = 16
 INPUT_DECIMAL_PLACES = 4
 ACCOUNTING_PRECISION = 30
 CENT = Decimal("0.01")
+PRINTABLE_STATUSES = (TestTransaction.Status.DRAFT, TestTransaction.Status.APPROVED)
 
 
 class TransitionConflict(Exception):
@@ -80,6 +83,29 @@ def _get_transaction(queryset, transaction_id):
 def get_transaction(*, actor, project_id, transaction_id):
     require_employee(actor)
     return _get_transaction(visible_transactions(actor, project_id), transaction_id)
+
+
+def transaction_lines(document):
+    return list(document.lines.select_related("work_node").order_by("line_no"))
+
+
+def can_print_transaction(actor, document):
+    return document.status in PRINTABLE_STATUSES and projects_for(
+        actor, Action.PRINT_TEST_DOCUMENT,
+    ).filter(pk=document.project_id).exists()
+
+
+def print_transaction_pdf(*, actor, project_id, transaction_id):
+    document = get_transaction(actor=actor, project_id=project_id, transaction_id=transaction_id)
+    require_project(actor, project_id, Action.PRINT_TEST_DOCUMENT)
+    if document.status not in PRINTABLE_STATUSES:
+        raise Http404
+
+    lines = transaction_lines(document)
+    markup = render_to_string("test_transactions/transaction_print.html", {
+        "document": document, "lines": lines, "total": total_amount(lines),
+    })
+    return document.document_no, print_client.render_pdf(markup)
 
 
 def get_attachment(*, actor, project_id, transaction_id, attachment_id):

@@ -31,7 +31,7 @@ erp_compose_env="$HOME/.config/alnahda-erp/dev.env"
 erp_compose() {
   docker --context rootless compose -p "$erp_compose_project" --env-file "$erp_compose_env" "$@"
 }
-erp_compose stop web
+erp_compose stop web printer
 erp_compose up -d --wait db
 erp_compose exec db sh -ec '
   export PGPASSWORD="$POSTGRES_PASSWORD"
@@ -47,10 +47,23 @@ CREATE ROLE erp_dev_web LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NORE
 \quit
 ```
 
-طبّق الترحيلات بخدمة الصيانة، ثم طبّق المنح بحساب مالك القاعدة. يُعاد تطبيق المنح بعد إعادة إنشاء الجداول أو ترقية المخطط.
+ابنِ الصورة المشتركة، ثم طبّق الترحيلات بخدمة الصيانة والمنح بحساب مالك القاعدة. تطبع النسخة الحالية اسم الشركة في رأس المستند. عند إتاحة الشعار المعتمد، اضبط `erp_logo` على مسار ملف PNG خارج المستودع قبل البناء. تدخل بصمته في إعداد البناء لتحديث الصورة عند تغيّر الأصل. يُعاد تطبيق المنح بعد إعادة إنشاء الجداول أو ترقية المخطط.
 
 ```bash
-erp_compose run --rm --build migrate
+erp_logo=
+erp_health_host=localhost
+erp_build_image() {
+  if [ -z "$erp_logo" ]; then
+    docker --context rootless build --tag "${erp_compose_project}-erp-app" .
+    return
+  fi
+  local erp_logo_digest
+  erp_logo_digest=$(sha256sum < "$erp_logo") &&
+  docker --context rootless build \
+    --secret "id=erp_print_logo,src=$erp_logo" \
+    --build-arg "ERP_PRINT_LOGO_SHA256=${erp_logo_digest%% *}" \
+    --tag "${erp_compose_project}-erp-app" .
+}
 erp_grants() {
   erp_compose exec -T db sh -ec '
     export PGPASSWORD="$POSTGRES_PASSWORD"
@@ -58,10 +71,12 @@ erp_grants() {
       -v ON_ERROR_STOP=1 -v runtime_role="$1" -v revoke_inventory_runtime="$2"
   ' _ "$1" "${2:-off}"
 }
-erp_grants erp_dev_web < ops/postgres/s1_05_runtime_grants.sql
-erp_grants erp_dev_web < ops/postgres/s1_08_inventory_runtime_grants.sql
-erp_compose up -d --build --wait web
-curl --fail http://127.0.0.1:8001/healthz/
+erp_build_image &&
+erp_compose run --rm --pull never migrate &&
+erp_grants erp_dev_web < ops/postgres/s1_05_runtime_grants.sql &&
+erp_grants erp_dev_web < ops/postgres/s1_08_inventory_runtime_grants.sql &&
+erp_compose up -d --no-build --pull never --wait web printer &&
+curl --fail -H "Host: $erp_health_host" http://127.0.0.1:8001/healthz/
 ```
 
 افحص `SELECT current_user` من اتصال Django في خدمة `web` ومن اتصال الصيانة. يسجل الفحص اسمَي الدورين فقط. على بيئة القبول الاصطناعية، تحقق من قراءة وإدراج أحداث التدقيق ومن رفض تغييرها أو حذفها بهوية التشغيل.
@@ -78,6 +93,12 @@ erp_compose run --rm -T migrate python manage.py shell -c "$erp_user_query"
 ```
 
 تستخدم كل بيئة وحدة مرفقات خاصة عند `/var/lib/erp/private` يملكها مستخدم تشغيل التطبيق. يمر تنزيل المرفق عبر مسار الموظفين المحمي. عند تشغيل Django خارج Compose، يحدد `ERP_PRIVATE_ROOT` مسارًا مطلقًا لمجلد خاص يملكه مستخدم التطبيق.
+
+### الطباعة الداخلية
+
+تعمل خدمة `printer` من صورة الإصدار نفسها على شبكة Compose داخلية خاصة. يرسل `web` إليها القالب بعد التحقق من المشروع وصلاحية الطباعة وحالة المعاملة. يتضمن الإصدار Chromium والخط العربي وBootstrap RTL، ويقرأ العامل الشعار من `apps/printing/assets/logo.png` عند تضمينه في الصورة. يحجز المشرف قفلًا واحدًا لكل بيئة على ملف `render.lock` داخل وحدة `printlock`. احتفظ بالملف والوحدة أثناء الترقية، وأوقف مثيل الطباعة كاملاً قبل تشغيل بديله.
+
+يضبط `ERP_WEB_WORKERS` عدد عمال الويب، ويضبط `ERP_PRINT_MEMORY_LIMIT` سقف ذاكرة حاوية الطباعة. القيمة الأولية للسقف `1g`. قِس ذروة الاستهلاك بعينة الـ80 سطرًا قبل تثبيت إعداد بيئة القبول. مهلة المشرف 30 ثانية ومهلة استدعاء الويب 35 ثانية. يعيد الطلب المتزامن `429` مع `Retry-After: 5`، ويستمر الويب وقاعدة البيانات في الخدمة أثناء تعافي عامل الطباعة.
 
 ### تنظيف المرفقات اليتيمة
 
