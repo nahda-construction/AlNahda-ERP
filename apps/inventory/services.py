@@ -1,27 +1,36 @@
-from decimal import Decimal
+from collections import defaultdict
+from decimal import Decimal, localcontext
 
 from django.core.exceptions import ValidationError
+from django.core.validators import DecimalValidator
 from django.db import IntegrityError, transaction
+from django.utils import timezone
 
 from apps.projects.models import Party
+from apps.test_transactions.models import AuditEvent
 
 from .models import (
     BALANCE_UNIQUE_CONSTRAINT,
     POOL_UNIQUE_CONSTRAINT,
     Material,
+    StockIssue,
     StockLocationBalance,
+    StockMovement,
     ValuationPool,
     Warehouse,
 )
 
 
-def _validate_references(*, owner_id, material_id, warehouse_id):
-    if not Party.objects.filter(pk=owner_id, identity_kind=Party.Kind.COMPANY, active=True).exists():
-        raise ValidationError("General stock requires an active company owner.")
+def _validate_references(*, owner_id, material_id, warehouse_id, owner_kind=None):
+    owners = Party.objects.filter(pk=owner_id, active=True)
+    if owner_kind is not None:
+        owners = owners.filter(identity_kind=owner_kind)
+    if not owners.exists():
+        raise ValidationError("Stock requires an active eligible owner.")
     if not Material.objects.filter(pk=material_id, active=True).exists():
-        raise ValidationError("General stock requires an active material.")
+        raise ValidationError("Stock requires an active material.")
     if not Warehouse.objects.filter(pk=warehouse_id, active=True).exists():
-        raise ValidationError("General stock requires an active warehouse.")
+        raise ValidationError("Stock requires an active warehouse.")
 
 
 def _validate_active_pool(pool):
@@ -40,7 +49,12 @@ def _is_unique_conflict(error, constraint_name):
 def ensure_general_stock_at_location(
     *, owner_id, material_id, warehouse_id,
 ) -> tuple[ValuationPool, StockLocationBalance]:
-    references = {"owner_id": owner_id, "material_id": material_id, "warehouse_id": warehouse_id}
+    references = {
+        "owner_id": owner_id,
+        "material_id": material_id,
+        "warehouse_id": warehouse_id,
+        "owner_kind": Party.Kind.COMPANY,
+    }
     pool_key = {
         "scope_type": ValuationPool.ScopeType.GENERAL_COMPANY,
         "project_id": None,
@@ -78,3 +92,75 @@ def ensure_general_stock_at_location(
         pool = ValuationPool.objects.get(pk=balance.pool_id, **pool_key)
         _validate_active_pool(pool)
         return pool, balance
+
+
+def _validate_available_balance(balance):
+    if balance.stock_state != StockLocationBalance.StockState.AVAILABLE:
+        raise ValidationError("Only available stock can be posted.")
+    pool = balance.pool
+    _validate_active_pool(pool)
+    _validate_references(
+        owner_id=pool.owner_id, material_id=pool.material_id, warehouse_id=balance.warehouse_id,
+    )
+
+
+def post_opening_stock(*, balance_id, quantity: Decimal) -> StockMovement:
+    if not isinstance(quantity, Decimal) or not quantity.is_finite() or quantity <= 0:
+        raise ValidationError("Opening quantity must be a positive finite Decimal.")
+    DecimalValidator(14, 4)(quantity)
+
+    with transaction.atomic():
+        try:
+            balance = StockLocationBalance.objects.select_for_update(of=("self",)).get(pk=balance_id)
+        except StockLocationBalance.DoesNotExist:
+            raise ValidationError("The stock balance does not exist.") from None
+        _validate_available_balance(balance)
+        if balance.quantity != 0 or StockMovement.objects.filter(
+            balance=balance, event_kind=StockMovement.EventKind.OPENING,
+        ).exists():
+            raise ValidationError("Opening stock requires a zero balance without an opening movement.")
+
+        movement = StockMovement.objects.create(
+            balance=balance, event_kind=StockMovement.EventKind.OPENING, signed_qty=quantity,
+        )
+        balance.quantity = quantity
+        balance.save(update_fields=("quantity",))
+        return movement
+
+
+def _issue_quantities(lines):
+    quantities = defaultdict(Decimal)
+    with localcontext(prec=28):
+        for line in lines:
+            quantities[line.balance_id] += line.qty
+    return quantities
+
+
+def _post_stock_issue(*, issue, actor, lines, balances_by_id) -> StockIssue:
+    """Post validated lines using the issue and balance locks held by the caller."""
+    if not transaction.get_connection().in_atomic_block:
+        raise transaction.TransactionManagementError("Stock posting requires an active transaction.")
+
+    lines = tuple(lines)
+    quantities = _issue_quantities(lines)
+    for line in lines:
+        StockMovement.objects.create(
+            balance_id=line.balance_id, issue_line=line, event_kind=StockMovement.EventKind.ISSUE,
+            signed_qty=line.qty.copy_negate(),
+        )
+    with localcontext(prec=28):
+        for balance_id, quantity in quantities.items():
+            balance = balances_by_id[balance_id]
+            balance.quantity -= quantity
+            balance.save(update_fields=("quantity",))
+
+    issue.status = StockIssue.Status.APPROVED
+    issue.approved_by = actor
+    issue.approved_at = timezone.now()
+    issue.save(update_fields=("status", "approved_by", "approved_at"))
+    AuditEvent.objects.create(
+        project_id=issue.project_id, actor=actor, occurred_at=issue.approved_at,
+        event_type=AuditEvent.EventType.APPROVED, stock_issue=issue,
+        prior_state=StockIssue.Status.DRAFT, next_state=StockIssue.Status.APPROVED,
+    )
+    return issue

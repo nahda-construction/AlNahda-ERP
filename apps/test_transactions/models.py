@@ -155,7 +155,10 @@ class AuditEvent(models.Model):
     event_type = models.CharField(max_length=8, choices=EventType)
     correlation_id = models.UUIDField(default=uuid.uuid4, editable=False)
     test_transaction = models.ForeignKey(
-        TestTransaction, on_delete=models.PROTECT, related_name="audit_events",
+        TestTransaction, on_delete=models.PROTECT, null=True, blank=True, related_name="audit_events",
+    )
+    stock_issue = models.ForeignKey(
+        "inventory.StockIssue", on_delete=models.PROTECT, null=True, blank=True, related_name="audit_events",
     )
     prior_state = models.CharField(
         max_length=9, choices=TestTransaction.Status, null=True, blank=True,
@@ -167,7 +170,17 @@ class AuditEvent(models.Model):
         constraints = [
             models.CheckConstraint(
                 condition=(
-                    Q(event_type="CREATED", prior_state__isnull=True, next_state="DRAFT")
+                    Q(test_transaction__isnull=False, stock_issue__isnull=True)
+                    | Q(test_transaction__isnull=True, stock_issue__isnull=False)
+                ),
+                name="audit_single_source",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    Q(
+                        event_type="CREATED", test_transaction__isnull=False,
+                        prior_state__isnull=True, next_state="DRAFT",
+                    )
                     | Q(
                         event_type="APPROVED",
                         prior_state__isnull=False,
@@ -179,6 +192,10 @@ class AuditEvent(models.Model):
             ),
             models.UniqueConstraint(
                 fields=("test_transaction", "event_type"), name="test_audit_source_event_unique",
+            ),
+            models.UniqueConstraint(
+                fields=("stock_issue",), condition=Q(stock_issue__isnull=False),
+                name="uq_stock_issue_audit_event",
             ),
         ]
 
