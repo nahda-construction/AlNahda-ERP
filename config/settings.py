@@ -18,6 +18,7 @@ INSTALLED_APPS = [
     "apps.contracts.apps.ContractsConfig",
     "apps.access_control.apps.AccessControlConfig",
     "apps.test_transactions.apps.TestTransactionsConfig",
+    "apps.inventory.apps.InventoryConfig",
 ]
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
