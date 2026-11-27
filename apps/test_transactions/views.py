@@ -5,9 +5,11 @@ from django.core.exceptions import ValidationError
 from django.core.paginator import Paginator
 from django.http import FileResponse, Http404, HttpResponse, HttpResponseBadRequest
 from django.shortcuts import redirect, render
-from django.views.decorators.http import require_http_methods, require_POST, require_safe
+from django.utils.http import content_disposition_header
+from django.views.decorators.http import require_GET, require_http_methods, require_POST, require_safe
 
 from apps.access_control.policies import Action, projects_for
+from apps.printing.client import PdfBusy, PdfUnavailable
 from apps.projects.models import Project
 
 from . import services, storage
@@ -23,7 +25,7 @@ class TransactionRequestMiddleware:
         try:
             response = self.get_response(request)
             match = request.resolver_match
-            if match and match.func in (transaction_detail, download_attachment):
+            if match and match.func in (transaction_detail, download_attachment, print_transaction):
                 response.headers["Cache-Control"] = "private, no-store"
             return response
         finally:
@@ -135,7 +137,7 @@ def create_transaction(request, project_id):
 @require_safe
 def transaction_detail(request, project_id, transaction_id):
     draft = services.get_transaction(actor=request.user, project_id=project_id, transaction_id=transaction_id)
-    lines = list(draft.lines.select_related("work_node").order_by("line_no"))
+    lines = services.transaction_lines(draft)
     can_approve = (
         draft.status == TestTransaction.Status.DRAFT
         and draft.project.status == Project.Status.ACTIVE
@@ -146,6 +148,30 @@ def transaction_detail(request, project_id, transaction_id):
         "draft": draft, "lines": lines, "total": services.total_amount(lines),
         "attachments": draft.attachments.order_by("uploaded_at") if can_download else (),
         "can_approve": can_approve,
+        "can_print": services.can_print_transaction(request.user, draft),
+    })
+
+
+@login_required
+@require_GET
+def print_transaction(request, project_id, transaction_id):
+    try:
+        reference, pdf = services.print_transaction_pdf(
+            actor=request.user, project_id=project_id, transaction_id=transaction_id,
+        )
+    except PdfBusy:
+        return HttpResponse(
+            "الطباعة مشغولة. أعد المحاولة بعد 5 ثوانٍ.", status=429,
+            content_type="text/plain; charset=utf-8", headers={"Retry-After": "5"},
+        )
+    except PdfUnavailable:
+        return HttpResponse(
+            "تعذّرت الطباعة مؤقتًا. أعد المحاولة لاحقًا.", status=503,
+            content_type="text/plain; charset=utf-8",
+        )
+    return HttpResponse(pdf, content_type="application/pdf", headers={
+        "Content-Disposition": content_disposition_header(True, f"{reference}.pdf"),
+        "X-Content-Type-Options": "nosniff",
     })
 
 

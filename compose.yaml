@@ -1,3 +1,7 @@
+x-erp-app: &erp-app
+  image: ${COMPOSE_PROJECT_NAME}-erp-app
+  build: .
+
 services:
   db:
     image: postgres:18
@@ -17,7 +21,7 @@ services:
       start_period: 5s
 
   web:
-    build: .
+    <<: *erp-app
     environment:
       DJANGO_SECRET_KEY: ${ERP_DJANGO_SECRET_KEY:?Set ERP_DJANGO_SECRET_KEY in the external environment file}
       POSTGRES_DB: ${ERP_DB_NAME:?Set ERP_DB_NAME in the external environment file}
@@ -25,6 +29,10 @@ services:
       POSTGRES_PASSWORD: ${ERP_WEB_DB_PASSWORD:?Set ERP_WEB_DB_PASSWORD in the external environment file}
       POSTGRES_HOST: db
       ERP_PRIVATE_ROOT: /var/lib/erp/private
+      ERP_PRINT_URL: http://printer:8010/render
+      ERP_INTERNAL_HOSTS: ${ERP_INTERNAL_HOSTS:-localhost,127.0.0.1}
+      ERP_OWNER_HOSTS: ${ERP_OWNER_HOSTS:-owner.localhost}
+      GUNICORN_CMD_ARGS: --workers ${ERP_WEB_WORKERS:-2} --timeout 45
     volumes:
       - privatefiles:/var/lib/erp/private
     ports:
@@ -32,19 +40,48 @@ services:
     networks:
       - frontend
       - database
+      - printing
     depends_on:
       db:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/healthz/', timeout=4).close()"]
+      test:
+        - CMD
+        - python
+        - -c
+        - |
+          import os
+          from urllib.request import Request, urlopen
+          host = next(value.strip() for value in os.environ["ERP_INTERNAL_HOSTS"].split(",") if value.strip())
+          request = Request("http://127.0.0.1:8000/healthz/", headers={"Host": host})
+          urlopen(request, timeout=4).close()
       interval: 5s
       timeout: 5s
       retries: 12
       start_period: 10s
 
+  printer:
+    <<: *erp-app
+    command: ["python", "-m", "apps.printing.worker"]
+    mem_limit: ${ERP_PRINT_MEMORY_LIMIT:-1g}
+    shm_size: 256m
+    restart: on-failure
+    stop_grace_period: 10s
+    tmpfs:
+      - /tmp:mode=1777
+    volumes:
+      - printlock:/var/lib/erp/print
+    networks:
+      - printing
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8010/healthz/', timeout=2).close()"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
   migrate:
     profiles: [maintenance]
-    build: .
+    <<: *erp-app
     command: ["python", "manage.py", "migrate", "--noinput"]
     environment:
       DJANGO_SECRET_KEY: ${ERP_DJANGO_SECRET_KEY:?Set ERP_DJANGO_SECRET_KEY in the external environment file}
@@ -61,8 +98,11 @@ services:
 volumes:
   pgdata:
   privatefiles:
+  printlock:
 
 networks:
   frontend:
   database:
+    internal: true
+  printing:
     internal: true

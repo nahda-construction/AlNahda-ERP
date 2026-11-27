@@ -3,6 +3,9 @@ from django.http import JsonResponse
 from django.urls import include, path
 from django.views.decorators.http import require_safe
 
+from apps.internal_api.access import docs_asset
+from apps.internal_api.api import api
+
 
 @require_safe
 def healthz(request):
@@ -17,4 +20,6 @@ def healthz(request):
 urlpatterns = [
     path("healthz/", healthz, name="healthz"),
     path("employees/", include("apps.test_transactions.urls")),
+    path("api/v1/docs/assets/ninja/<str:asset>", docs_asset, name="internal-api-docs-asset"),
+    path("api/v1/", api.urls),
 ]

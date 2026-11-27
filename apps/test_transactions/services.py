@@ -1,16 +1,19 @@
 import hashlib
 import json
 import uuid
+from contextlib import nullcontext
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP, localcontext
 
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.core.validators import DecimalValidator
 from django.db import IntegrityError, connection, transaction
 from django.http import Http404
+from django.template.loader import render_to_string
 from django.urls import reverse
 from django.utils import timezone
 
 from apps.access_control.policies import Action, is_internal_employee, projects_for
+from apps.printing import client as print_client
 from apps.projects.models import Project, WorkNode
 
 from . import storage
@@ -24,6 +27,7 @@ UNIT_PRICE_DIGITS = 16
 INPUT_DECIMAL_PLACES = 4
 ACCOUNTING_PRECISION = 30
 CENT = Decimal("0.01")
+PRINTABLE_STATUSES = (TestTransaction.Status.DRAFT, TestTransaction.Status.APPROVED)
 
 
 class TransitionConflict(Exception):
@@ -80,6 +84,29 @@ def _get_transaction(queryset, transaction_id):
 def get_transaction(*, actor, project_id, transaction_id):
     require_employee(actor)
     return _get_transaction(visible_transactions(actor, project_id), transaction_id)
+
+
+def transaction_lines(document):
+    return list(document.lines.select_related("work_node").order_by("line_no"))
+
+
+def can_print_transaction(actor, document):
+    return document.status in PRINTABLE_STATUSES and projects_for(
+        actor, Action.PRINT_TEST_DOCUMENT,
+    ).filter(pk=document.project_id).exists()
+
+
+def print_transaction_pdf(*, actor, project_id, transaction_id):
+    document = get_transaction(actor=actor, project_id=project_id, transaction_id=transaction_id)
+    require_project(actor, project_id, Action.PRINT_TEST_DOCUMENT)
+    if document.status not in PRINTABLE_STATUSES:
+        raise Http404
+
+    lines = transaction_lines(document)
+    markup = render_to_string("test_transactions/transaction_print.html", {
+        "document": document, "lines": lines, "total": total_amount(lines),
+    })
+    return document.document_no, print_client.render_pdf(markup)
 
 
 def get_attachment(*, actor, project_id, transaction_id, attachment_id):
@@ -150,6 +177,29 @@ def total_amount(lines):
         return sum((line.amount for line in lines), Decimal("0.00"))
 
 
+def transaction_detail_payload(draft, lines, attachment_ids):
+    return {
+        "id": str(draft.pk),
+        "reference": draft.document_no,
+        "status": draft.status,
+        "title": draft.title,
+        "lines": [
+            {
+                "line_no": line.line_no,
+                "work_node_id": str(line.work_node_id),
+                "description": line.description,
+                "qty": _input_decimal_text(line.qty),
+                "unit_price": _input_decimal_text(line.unit_price),
+                "amount": format(line.amount, ".2f"),
+            }
+            for line in lines
+        ],
+        "total": format(total_amount(lines), ".2f"),
+        "created_at": draft.created_at.isoformat(),
+        "attachment_ids": [str(attachment_id) for attachment_id in attachment_ids],
+    }
+
+
 def _prepare_draft(actor, project_id, title, lines):
     project = require_project(actor, project_id, Action.CREATE_TEST_DRAFT, for_write=True)
     return project.pk, _text(title, 160, required=True), _prepare_lines(project.pk, lines)
@@ -162,11 +212,12 @@ def _save_prepared_draft(actor, project_id, title, lines, staged_file, storage_k
     for line in lines:
         line.transaction = draft
     TestTransactionLine.objects.bulk_create(lines)
-    Attachment.objects.create(
-        project_id=project_id, transaction=draft, storage_key=storage_key,
-        original_name=staged_file.original_name, media_type=storage.PDF_MEDIA_TYPE,
-        size_bytes=staged_file.size_bytes, sha256=staged_file.sha256, uploaded_by=actor,
-    )
+    if staged_file is not None:
+        Attachment.objects.create(
+            project_id=project_id, transaction=draft, storage_key=storage_key,
+            original_name=staged_file.original_name, media_type=storage.PDF_MEDIA_TYPE,
+            size_bytes=staged_file.size_bytes, sha256=staged_file.sha256, uploaded_by=actor,
+        )
     AuditEvent.objects.create(
         project_id=project_id, actor=actor, test_transaction=draft,
         event_type=AuditEvent.EventType.CREATED, next_state=TestTransaction.Status.DRAFT,
@@ -174,13 +225,16 @@ def _save_prepared_draft(actor, project_id, title, lines, staged_file, storage_k
     return draft
 
 
-def _decimal_for_fingerprint(value):
+def _input_decimal_text(value):
     if value.is_zero():
         value = value.copy_abs()
     return format(value, f".{INPUT_DECIMAL_PLACES}f")
 
 
 def _draft_fingerprint(project_id, title, lines, staged_file):
+    attachment = None
+    if staged_file is not None:
+        attachment = {"sha256": staged_file.sha256, "original_name": staged_file.original_name}
     payload = {
         "project_id": str(project_id),
         "title": title,
@@ -188,12 +242,12 @@ def _draft_fingerprint(project_id, title, lines, staged_file):
             {
                 "work_node": str(line.work_node_id),
                 "description": line.description,
-                "qty": _decimal_for_fingerprint(line.qty),
-                "unit_price": _decimal_for_fingerprint(line.unit_price),
+                "qty": _input_decimal_text(line.qty),
+                "unit_price": _input_decimal_text(line.unit_price),
             }
             for line in lines
         ],
-        "attachment": {"sha256": staged_file.sha256, "original_name": staged_file.original_name},
+        "attachment": attachment,
     }
     canonical = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
@@ -207,6 +261,19 @@ def _get_completed_record(*, actor_id, project_id, operation, key):
 
 
 def create_draft_once(*, actor, project_id, key, title, lines, uploaded_file):
+    return _create_draft_once(
+        actor=actor, project_id=project_id, key=key, title=title, lines=lines,
+        upload=storage.stage_pdf(uploaded_file),
+    )
+
+
+def create_json_draft_once(*, actor, project_id, key, title, lines):
+    return _create_draft_once(
+        actor=actor, project_id=project_id, key=key, title=title, lines=lines, upload=nullcontext(),
+    )
+
+
+def _create_draft_once(*, actor, project_id, key, title, lines, upload):
     project_id, title, lines = _prepare_draft(actor, project_id, title, lines)
     try:
         key = uuid.UUID(str(key))
@@ -216,7 +283,7 @@ def create_draft_once(*, actor, project_id, key, title, lines, uploaded_file):
         "actor_id": actor.pk, "project_id": project_id,
         "operation": IdempotencyRecord.Operation.CREATE_TEST_DRAFT, "key": key,
     }
-    with storage.stage_pdf(uploaded_file) as staged_file:
+    with upload as staged_file:
         fingerprint = _draft_fingerprint(project_id, title, lines, staged_file)
         with transaction.atomic():
             try:
@@ -238,15 +305,19 @@ def create_draft_once(*, actor, project_id, key, title, lines, uploaded_file):
 
             # The insert can also wait for a competing transaction that rolls back.
             require_project(actor, project_id, Action.CREATE_TEST_DRAFT, for_write=True)
-            storage_key = storage.publish(staged_file)
+            storage_key = storage.publish(staged_file) if staged_file is not None else None
             draft = _save_prepared_draft(actor, project_id, title, lines, staged_file, storage_key)
             record.test_transaction = draft
-            record.response_status = 303
-            record.response_body = {
-                "transaction_id": str(draft.pk),
-                "document_no": draft.document_no,
-                "location": reverse("test_transactions:detail", args=(project_id, draft.pk)),
-            }
+            if staged_file is None:
+                record.response_status = 201
+                record.response_body = transaction_detail_payload(draft, lines, ())
+            else:
+                record.response_status = 303
+                record.response_body = {
+                    "transaction_id": str(draft.pk),
+                    "document_no": draft.document_no,
+                    "location": reverse("test_transactions:detail", args=(project_id, draft.pk)),
+                }
             record.status = IdempotencyRecord.Status.COMPLETED
             record.save(update_fields=("test_transaction", "response_status", "response_body", "status"))
             return record

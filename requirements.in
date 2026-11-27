@@ -1,3 +1,5 @@
 Django>=5.2,<5.3
 psycopg[binary]>=3.2,<4
 gunicorn>=25,<26
+playwright>=1.65,<1.66
+django-ninja>=1.8,<1.9
