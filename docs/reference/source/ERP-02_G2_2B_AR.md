@@ -15,7 +15,7 @@
 | `SRS-236` و`S1-11` | **Django Ninja** مكتبة API الوحيدة. الاختيار يناسب عدد المسارات الأولية، يولد OpenAPI من مخططات الإدخال والإخراج ويستخدم جلسات Django. يُثبّت إصدار المكتبة في ملف الاعتماديات بعد اختبار التوافق. تستخدم العمليات المعدّلة تحقق CSRF مع مصادقة الجلسة، وتشترك مع Templates وHTMX في خدمات الأعمال والصلاحيات. توثيق OpenAPI داخلي ومحمي، وأصول واجهته محلية إن فُعّلت. |
 | `FIN` | جدول عشر سياسات مرفق وجاهز للعرض بالتوازي. يوقع المحاسب والإدارة الأحداث والقيود وتاريخ السريان لكل مسار قبل ترحيله المالي الحي. جُمعت البنود من مصفوفة v1.6 وتصحيحات 2A لأن أصل الجدول المستقل لم يتوفر. الحسابات الأربعة مسميات رقابية مقترحة للتوقيع. |
 
-المراجع [سجل القرارات v1.6 §3](https://chatgpt.com/library?file_id=libfile_72139d66b49081919a4ae819a885cc20&account_id=personal) · [سجل الفجوات v1.6](https://chatgpt.com/library?file_id=libfile_c1cdf51a97808191acabb19e18f8cca6&account_id=personal) · [Master SRS v0.7](https://chatgpt.com/library?file_id=libfile_e7f1e991d9108191825d7a663039eb58&account_id=personal) · [الدفعة 2A](https://chatgpt.com/library?file_id=libfile_9dd8c589c2b48191adb12c7e7d78aa26&account_id=personal) · [Django Ninja OpenAPI](https://django-ninja.dev/guide/openapi/) · [Django Ninja CSRF](https://django-ninja.dev/guide/csrf/).
+المراجع [سجل القرارات v1.6 §3](../handover-v1.6/decisions_ledger.md) · [سجل الفجوات v1.6](../handover-v1.6/open_blockers.md) · [Master SRS v0.7](../handover-v1.6/master_srs.md) · [الدفعة 2A](ERP-02_G2_2A_AR.md) · [Django Ninja OpenAPI](https://django-ninja.dev/guide/openapi/) · [Django Ninja CSRF](https://django-ninja.dev/guide/csrf/).
 
 ## 2. بروتوكول Codex
 
@@ -96,7 +96,7 @@
 - **S1-AT-01.** تُجرى محاكاة آلية لانقطاع الخروج في بيئة معزولة، ويصدر القبول من تجربة خادم وجهازين مع قطع الإنترنت فعلًا وإبقاء LAN، وملفي تعريف متصفح جديدين بعد القطع. يُسجل فشل وصول خارجي من الأجهزة الثلاثة، وحفظ مرجعين ومرفقين أثناء القطع وPDF لكل حساب. يُراجع تشكيل العربية والأرقام المختلطة وتكرار رؤوس الجدول، وتُفحص مصادر الأصول واستئناف النسخ الخارجية.
 - **S1-AT-02.** يُؤتمت أخذ النسخة والتحقق من قائمة محتوياتها واستعادتها وفحص بصمات الإصدار والمرفق ومخرجات الصحة. يجري القبول على خادم Linux آخر أو VM محلية نظيفة ومعزولة بقاعدة ومرفقات في وحدات جديدة. تُفتح معاملة S1-AT-01 ويطابق مرفقها وتتحقق صلاحياتها بعد الاستعادة. توثق التغييرات المقتصرة على إعدادات النشر. يعاد الاختبار قبل Pilot بالحجم الممثل وقياسات RPO وRTO.
 
-المراجع [اختبارات القبول v1.6](https://chatgpt.com/library?file_id=libfile_dc9db4d2ec748191b4df1d1540efc130&account_id=personal) · [قفل الصفوف واختباره في Django](https://docs.djangoproject.com/en/5.2/ref/models/querysets/#select-for-update).
+المراجع [اختبارات القبول v1.6](../handover-v1.6/acceptance_tests.md) · [قفل الصفوف واختباره في Django](https://docs.djangoproject.com/en/5.2/ref/models/querysets/#select-for-update).
 
 ## 4. الوصول الخارجي وبوابة SEC
 
@@ -115,7 +115,7 @@
 - حجب مسارات الإدارة الداخلية من المضيف العام، تعطيل التخزين المشترك للمحتوى الخاص وملفات PDF، وتحديد حدود الطلبات ورفع الملفات وسجل تدقيق للنشر والتنزيل. إثبات أن تعطيل النفق يغلق الوصول الخارجي وحده مع استمرار المكتب. تبقى إجراءات النسخ والاستعادة والإيقاف موثقة قبل الفتح.
 - يوقع مسؤول الأمان والتشغيل والإدارة نتيجة SEC قبل استخدام بيانات مالك حقيقية على النطاق العام. يحتفظ فريق التشغيل بمسار رجوع يوقف النشر ويعزل الأثر ويحفظ سجل التدقيق.
 
-المراجع [Cloudflare Tunnel والجدار الناري](https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/configure-tunnels/tunnel-with-firewall/) · [Cloudflare Access لتطبيق ذاتي الاستضافة](https://developers.cloudflare.com/cloudflare-one/access-controls/applications/http-apps/self-hosted-public-app/) · [سير العمل والصلاحيات v1.6](https://chatgpt.com/library?file_id=libfile_a801ef91ea6081919f7abd2d41cb33e2&account_id=personal).
+المراجع [Cloudflare Tunnel والجدار الناري](https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/configure-tunnels/tunnel-with-firewall/) · [Cloudflare Access لتطبيق ذاتي الاستضافة](https://developers.cloudflare.com/cloudflare-one/access-controls/applications/http-apps/self-hosted-public-app/) · [سير العمل والصلاحيات v1.6](../handover-v1.6/workflows_and_security.md).
 
 ## 5. قائمة G2 وشرط أول أمر برمجة
 
@@ -129,3 +129,5 @@
 | **بوابات مستقلة لاحقًا** | FIN للتوقيع قبل الترحيل المالي الحي، SEC قبل بوابة المالك الخارجية، G4 قبل Pilot الحي، G5 لـGo-Live بعد المطابقة والقبول والاستعادة. | يمنع نقص أي اعتماد الإجراء الواقع ضمن تلك البوابة. تستمر الأعمال المصرح بها ببيانات اصطناعية وفق تبعياتها. |
 
 **حالة التسليم.** 2B جاهزة للاعتماد النهائي. يصدر قرار إغلاق G2 والانتقال إلى تصميم G3 من الإدارة. أول أمر برمجة في G3 يلي اعتماد تصميم Sprint 1 وإذن التنفيذ المستقل.
+
+ملاحظة النسخة العامة: استبدلت روابط المكتبة الخاصة بمراجع محلية حيث أمكن، ووسمت المراجع غير المودعة؛ النص الحاكم محفوظ دون تغيير قواعد الأعمال. ليست هذه النسخة مطابقة بايتياً لأصل المكتبة.

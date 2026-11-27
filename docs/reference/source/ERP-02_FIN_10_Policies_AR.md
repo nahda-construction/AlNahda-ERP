@@ -26,4 +26,6 @@
 | اسم المحاسب القانوني وتوقيعه وتاريخه |  |
 | اعتماد الإدارة وتاريخه |  |
 
-المراجع [سجل القرارات v1.6](https://chatgpt.com/library?file_id=libfile_72139d66b49081919a4ae819a885cc20&account_id=personal) · [سجل الفجوات v1.6](https://chatgpt.com/library?file_id=libfile_c1cdf51a97808191acabb19e18f8cca6&account_id=personal) · [قواعد الأعمال ومصفوفة القيود](https://chatgpt.com/library?file_id=libfile_0bff25c87f048191815f00aae003fa73&account_id=personal).
+المراجع [سجل القرارات v1.6](../handover-v1.6/decisions_ledger.md) · [سجل الفجوات v1.6](../handover-v1.6/open_blockers.md) · [قواعد الأعمال ومصفوفة القيود](../handover-v1.6/business_rules_and_posting.md).
+
+ملاحظة النسخة العامة: استبدلت روابط المكتبة الخاصة بمراجع محلية حيث أمكن، ووسمت المراجع غير المودعة؛ النص الحاكم محفوظ دون تغيير قواعد الأعمال. ليست هذه النسخة مطابقة بايتياً لأصل المكتبة.

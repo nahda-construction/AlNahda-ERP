@@ -26,4 +26,6 @@
 
 تغلق G2 البند GAP-03 والاختيارات المعمارية من GAP-04. تبقى اختبارات التوافق والتشغيل والاستعادة وإصدارات الحزم النهائية ضمن G3 والتنفيذ والقبول.
 
-المراجع [Handover v1.6](https://chatgpt.com/library?file_id=libfile_fef6c32a42c08191bfd6695ae096d9bf&account_id=personal) · [Master SRS v0.7](https://chatgpt.com/library?file_id=libfile_e7f1e991d9108191825d7a663039eb58&account_id=personal) · [سجل القرارات النافذة](https://chatgpt.com/library?file_id=libfile_72139d66b49081919a4ae819a885cc20&account_id=personal) · [الفجوات](https://chatgpt.com/library?file_id=libfile_c1cdf51a97808191acabb19e18f8cca6&account_id=personal) · [2A](https://chatgpt.com/library?file_id=libfile_9dd8c589c2b48191adb12c7e7d78aa26&account_id=personal) · [2B](https://chatgpt.com/library?file_id=libfile_33c39ef669fc8191ac27329f2e7cea2f&account_id=personal) · [غلاف FIN](https://chatgpt.com/library?file_id=libfile_a5c967107ab88191b4d03b04fb447224&account_id=personal) · توجيهات الإدارة في رسالة اعتماد 2B بتاريخ المحضر.
+المراجع [Handover v1.6](../handover-v1.6/README.md) · [Master SRS v0.7](../handover-v1.6/master_srs.md) · [سجل القرارات النافذة](../handover-v1.6/decisions_ledger.md) · [الفجوات](../handover-v1.6/open_blockers.md) · [2A](ERP-02_G2_2A_AR.md) · [2B](ERP-02_G2_2B_AR.md) · [غلاف FIN](ERP-02_FIN_10_Policies_AR.md) · توجيهات الإدارة في رسالة اعتماد 2B بتاريخ المحضر.
+
+ملاحظة النسخة العامة: استبدلت روابط المكتبة الخاصة بمراجع محلية حيث أمكن، ووسمت المراجع غير المودعة؛ النص الحاكم محفوظ دون تغيير قواعد الأعمال. ليست هذه النسخة مطابقة بايتياً لأصل المكتبة.
