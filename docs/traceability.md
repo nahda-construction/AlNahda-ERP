@@ -30,3 +30,9 @@
 | S1-10 وS1-11 | [#15](https://github.com/nahda-construction/AlNahda-ERP/pull/15) | [PostgreSQL 18](https://github.com/nahda-construction/AlNahda-ERP/actions/runs/45943900808/job/140324108623) · [cgroups](https://github.com/nahda-construction/AlNahda-ERP/actions/runs/45943900808/job/140324108879) |
 
 [الإصدارات](reference/versions.md). لا تُستنتج نتيجة فحص الرأس الحالي من أدلة رؤوس سابقة.
+
+## مصفوفتا القبول الفردي
+
+- [S1-01 إلى S1-06](reference/acceptance-trace-s1-01-06.md): 36 معياراً.
+- [S1-07 إلى S1-11](reference/acceptance-trace-s1-07-11.md): 23 معياراً.
+- المجموع 59 معياراً و124 إحالة لتعريفات الاختبارات؛ الإحالات مرشحة للتغطية وليست إثبات كل assertion أو قبول UAT مستقل. [مطابقة Handover](reference/handover-verification.md).
