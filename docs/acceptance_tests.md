@@ -20,3 +20,10 @@
 | S1-05 وS1-06 | دُمجتا عبر [#9](https://github.com/nahda-construction/AlNahda-ERP/pull/9)، واجتاز main فحص PostgreSQL 18 بعد الدمج. [النتيجة](https://github.com/nahda-construction/AlNahda-ERP/actions/runs/45698042533/job/139500514695) |
 
 هذا الملف أدلة التنفيذ لا بديل عن RTM واختبارات UAT في Handover.
+
+## سجلات التشغيل المسترجعة
+
+- [قبول S1-01](reference/source/S1-01-acceptance-20261125-022514.log.md): نجاح الاختبارين والصحة وعزل البيئتين وإعادة التشغيل.
+- [توافق S1-02](reference/source/S1-02-compatibility-20261125-024553.log.md): S1-02_COMPAT_OK، الترحيلات والقيود والقفل والنسخ والاستعادة.
+
+السجلان تاريخيان؛ لا يعاد تصنيفهما كقبول للرأس الحالي أو قبول إنتاجي.

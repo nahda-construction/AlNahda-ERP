@@ -4,8 +4,8 @@
 
 | المعيار | حالة الاختبار | الدليل والحدود |
 |---|---|---|
-| S1-01-1 | قبول تشغيلي | [سجل المصدر](source/ERP-02_G3_S1-01_Approval_AR.md)؛ سجل الاعتماد؛ بصمات وجاهزية تاريخية؛ ملف القبول الخام غير مودع. |
-| S1-01-2 | قبول تشغيلي | [سجل المصدر](source/ERP-02_G3_S1-01_Approval_AR.md)؛ قبول Compose وعزل البيئتين؛ دليل التشغيل الخام غير مودع. |
+| S1-01-1 | قبول تشغيلي | [سجل المصدر](source/ERP-02_G3_S1-01_Approval_AR.md)؛ سجل الاعتماد؛ بصمات وجاهزية تاريخية؛ سجل القبول المسترجع مرفق أدناه. |
+| S1-01-2 | قبول تشغيلي | [سجل المصدر](source/ERP-02_G3_S1-01_Approval_AR.md)؛ قبول Compose وعزل البيئتين؛ سجل التشغيل المسترجع مرفق أدناه. |
 | S1-01-3 | [test_health_uses_the_configured_database](../../tests/test_health.py#L9) | [سجل المصدر](source/ERP-02_G3_S1-01_Approval_AR.md)؛ ترحيلات وصحة البيئتين؛ الاختبار البرمجي جزئي. |
 | S1-01-4 | [test_database_failure_returns_a_generic_response](../../tests/test_health.py#L17) | [سجل المصدر](source/ERP-02_G3_S1-01_Approval_AR.md)؛ إعادة التشغيل وحفظ البيانات تحتاج سجل Compose. |
 | S1-01-5 | قبول تشغيلي | [سجل المصدر](source/ERP-02_G3_S1-01_Approval_AR.md)؛ سجل الاعتماد وخطة الرجوع في البطاقة؛ لا ادعاء مطابقة الفرق الخام. |
@@ -41,4 +41,11 @@
 | S1-06-A06 | [test_postgresql_protects_completed_receipt_from_rewrite_or_reset](../../tests/test_s1_06_idempotency.py#L364) | [PR #9](https://github.com/nahda-construction/AlNahda-ERP/pull/9)؛ المنح والترحيل والرجوع: أدلة PR #9. |
 | S1-06-A07 | [test_key_violation_recovers_original_driver_diagnostics_after_savepoint](../../tests/test_s1_06_idempotency.py#L261)؛ [test_other_real_insert_constraint_failures_propagate_original_exception](../../tests/test_s1_06_idempotency.py#L286)؛ [test_postgresql_rejects_null_scopes_and_invalid_result_shapes](../../tests/test_s1_06_idempotency.py#L316) | [PR #9](https://github.com/nahda-construction/AlNahda-ERP/pull/9)؛ ربط مرشح؛ تحقق الشروط الفرعية غير مستقل. |
 
-لا إغلاق FIN/SEC أو UAT ميدانية. سجلات القبول المحلية الخام لـ S1-01/02 تحتاج تحققاً منفصلاً.
+لا إغلاق FIN/SEC أو UAT ميدانية. سجلات القبول المحلية مسترجعة ومرفقة؛ لا ادعاء إعادة تنفيذها.
+
+## سجلات التشغيل المسترجعة
+
+- [قبول S1-01](source/S1-01-acceptance-20261125-022514.log.md): نجاح الاختبارين والصحة وعزل البيئتين وإعادة التشغيل.
+- [توافق S1-02](source/S1-02-compatibility-20261125-024553.log.md): S1-02_COMPAT_OK، الترحيلات والقيود والقفل والنسخ والاستعادة.
+
+السجلان تاريخيان؛ لا يعاد تصنيفهما كقبول للرأس الحالي أو قبول إنتاجي.
