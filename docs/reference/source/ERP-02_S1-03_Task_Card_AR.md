@@ -41,4 +41,6 @@
 
 يُسلّم فرق الفرع وقائمة الملفات والالتزام ونتائج الاختبارات وأثر Migration للمراجعة. يظل الدمج في `main` قرارًا مستقلًا. يُختبر عكس ترحيلات S1-03 في قاعدة اصطناعية معزولة بعد التحقق من غياب التبعيات اللاحقة. بعد الدمج يُراجع الرجوع عبر `git revert` على فرع مراجعة، ويُفصل قرار الرجوع ببيانات قاعدة حقيقية عن رجوع الكود.
 
-المراجع [تصميم G3 §2](https://chatgpt.com/library?file_id=libfile_144c4c780788819184870e4654c3dac9&account_id=personal) · [خطة G2 2B](https://chatgpt.com/library?file_id=libfile_33c39ef669fc8191ac27329f2e7cea2f&account_id=personal) · [إغلاق S1-02](https://chatgpt.com/library?file_id=libfile_d640f5cac6788191ac2fbf3803fe052a&account_id=personal) · [سجل القرارات](https://chatgpt.com/library?file_id=libfile_72139d66b49081919a4ae819a885cc20&account_id=personal) · [اختبارات القبول N08–N10](https://chatgpt.com/library?file_id=libfile_dc9db4d2ec748191b4df1d1540efc130&account_id=personal).
+المراجع [تصميم G3 §2](ERP-02_G3_Sprint_1_Design_AR.md) · [خطة G2 2B](ERP-02_G2_2B_AR.md) · [إغلاق S1-02](ERP-02_S1-02_Compatibility_Record_AR.md) · [سجل القرارات](../handover-v1.6/decisions_ledger.md) · [اختبارات القبول N08–N10](../handover-v1.6/acceptance_tests.md).
+
+ملاحظة النسخة العامة: استبدلت روابط المكتبة الخاصة بمراجع محلية حيث أمكن، ووسمت المراجع غير المودعة؛ النص الحاكم محفوظ دون تغيير قواعد الأعمال. ليست هذه النسخة مطابقة بايتياً لأصل المكتبة.

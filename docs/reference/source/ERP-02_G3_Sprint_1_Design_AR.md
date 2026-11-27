@@ -150,4 +150,7 @@
 
 تعتمد الإدارة جذر المستودع وبيئة Linux الفعلية، والحدود والقيود المقترحة لـS1، وعقد API، وقفل PDF ومهلته، وخطة النسخ والقبول. تعتمَد البطاقة والنسخة المرافقة من AGENTS.md. يظل اختيار جهاز الإنتاج النهائي معلقًا على قياس GAP-28/31. يستكمل متخصصو العمليات وQA تفاصيل التقريب والأمان والإنتاج عند بواباتها. بعد مراجعة المواصفة والبطاقة يصدر إذن مستقل قبل إنشاء مستودع Git أو بدء S1-01. يخص الإذن الأول S1-01 وحدها.
 
-المراجع الداخلية [Handover v1.6](https://chatgpt.com/library?file_id=libfile_fef6c32a42c08191bfd6695ae096d9bf&account_id=personal) · [Master SRS v0.7](https://chatgpt.com/library?file_id=libfile_e7f1e991d9108191825d7a663039eb58&account_id=personal) · [سجل القرارات](https://chatgpt.com/library?file_id=libfile_72139d66b49081919a4ae819a885cc20&account_id=personal) · [النموذج المنطقي](https://chatgpt.com/library?file_id=libfile_440270db648081919c3404b9d14dc020&account_id=personal) · [اختبارات القبول](https://chatgpt.com/library?file_id=libfile_dc9db4d2ec748191b4df1d1540efc130&account_id=personal) · [2A](https://chatgpt.com/library?file_id=libfile_9dd8c589c2b48191adb12c7e7d78aa26&account_id=personal) · [2B](https://chatgpt.com/library?file_id=libfile_33c39ef669fc8191ac27329f2e7cea2f&account_id=personal).
+المراجع الداخلية [Handover v1.6](../handover-v1.6/README.md) · [Master SRS v0.7](../handover-v1.6/master_srs.md) · [سجل القرارات](../handover-v1.6/decisions_ledger.md) · [النموذج المنطقي](../handover-v1.6/data_model_schema.md) · [اختبارات القبول](../handover-v1.6/acceptance_tests.md) · [2A](ERP-02_G2_2A_AR.md) · [2B](ERP-02_G2_2B_AR.md).
+
+
+ملاحظة النسخة العامة: استبدلت روابط المكتبة الخاصة بمراجع محلية حيث أمكن، ووسمت المراجع غير المودعة؛ النص الحاكم محفوظ دون تغيير قواعد الأعمال. ليست هذه النسخة مطابقة بايتياً لأصل المكتبة.

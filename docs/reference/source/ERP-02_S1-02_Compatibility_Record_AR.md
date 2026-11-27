@@ -24,4 +24,6 @@
 
 يعتمد هذا السجل نتائج فحص التوليفة الأولي دون تثبيت نهائي للإصدارات. تظل أدلة قيود التطبيق والتزامن ضمن S1-07 إلى S1-09، وأدلة نسخ التطبيق واستعادته ضمن S1-13. جاء التنفيذ في صورة فحص تشغيلي خارج المستودع، وحُفظ التقرير كمخرج S1-02. اعتمد صاحب المشروع النتائج وإغلاق S1-02 في 25 نوفمبر 2026. تُعرض بطاقة S1-03 للمراجعة قبل صدور إذن تنفيذها.
 
-المراجع [S1-02-compatibility-20261125-024553.log](https://chatgpt.com/library?file_id=libfile_1b5fbe0b99508191b8cdf7fe03b40a06&account_id=personal) · [ERP-02_G2_2B_AR.md](https://chatgpt.com/library?file_id=libfile_33c39ef669fc8191ac27329f2e7cea2f&account_id=personal) · [ERP-02_G3_S1-01_Approval_AR.md](https://chatgpt.com/library?file_id=libfile_5190ae3d4cbc819180f0fd26f0e86817&account_id=personal).
+المراجع [S1-02-compatibility-20261125-024553.log](S1-02-compatibility-20261125-024553.log.md) · [ERP-02_G2_2B_AR.md](ERP-02_G2_2B_AR.md) · [ERP-02_G3_S1-01_Approval_AR.md](ERP-02_G3_S1-01_Approval_AR.md).
+
+ملاحظة النسخة العامة: استبدلت روابط المكتبة الخاصة بمراجع محلية حيث أمكن، ووسمت المراجع غير المودعة؛ النص الحاكم محفوظ دون تغيير قواعد الأعمال. ليست هذه النسخة مطابقة بايتياً لأصل المكتبة.
