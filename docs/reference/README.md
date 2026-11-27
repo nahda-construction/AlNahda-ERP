@@ -1,24 +1,32 @@
-# فهرس المرجعية
+# فهرس المرجعية — 27 نوفمبر 2026
 
-تُجمع مراجع المشروع على GitHub وفق توجيه الإدارة في 27 نوفمبر 2026. يحدد [AGENTS.md](../../AGENTS.md) ترتيب الحجية، وتسجل حالة التنفيذ في [حالة المشروع](../project_state.md). تُحفظ الأسرار والبيانات التشغيلية الفعلية خارج Git.
+اقرأ [AGENTS.md](../../AGENTS.md) لترتيب الحجية و[حالة المشروع](../project_state.md) لنقطة الاستئناف. هذا الفهرس مرجع التوجيه الحالي؛ النصوص القديمة تحفظ كما استُرجعت، ولا تعيد فتح بوابات سابقة. الأسرار والبيانات التشغيلية خارج Git.
 
-## المصادر المتاحة
+| المصدر | الإصدار والحجية |
+| --- | --- |
+| [Handover README](handover-v1.6/README.md) | لقطة 22 نوفمبر؛ تعليمات الحالة التاريخية لا تتقدم على حالة المشروع الحالية |
+| [Master SRS](handover-v1.6/master_srs.md) | v0.7؛ تجميع مقترح، القرارات الصريحة نافذة في نطاقها |
+| [القرارات الوظيفية](handover-v1.6/decisions_ledger.md) | v1.6؛ §3 النافذ، §6 التاريخ، §8 التعديل |
+| [قواعد الأعمال والترحيل](handover-v1.6/business_rules_and_posting.md) | v1.6؛ FIN شرط الترحيل الحي |
+| [النموذج المنطقي](handover-v1.6/data_model_schema.md) | v1.6؛ تصميم مقترح لا اعتماد فيزيائي شامل |
+| [القاموس](handover-v1.6/domain_glossary.md) | v1.6؛ مرجع مصطلحات |
+| [سير العمل والأمان](handover-v1.6/workflows_and_security.md) | v1.6؛ SEC شرط الوصول الخارجي |
+| [الفجوات الوظيفية](handover-v1.6/open_blockers.md) | v1.6؛ تُغلق وفق بواباتها |
+| [اختبارات القبول وRTM](handover-v1.6/acceptance_tests.md) | v1.6؛ 241 معرفاً؛ سيناريوهات مقترحة لا نتائج تنفيذ |
+| [حالة Handover التاريخية](handover-v1.6/project_state.md) | v1.6؛ لا تحدد نقطة الاستئناف الحالية |
+| [G2 closure](source/ERP-02_G2_Closure_AR.md) · [2A](source/ERP-02_G2_2A_AR.md) · [2B](source/ERP-02_G2_2B_AR.md) | إغلاق G2 وتصحيحات التخطيط النافذة |
+| [G3](source/ERP-02_G3_Sprint_1_Design_AR.md) · [اعتماده](source/ERP-02_G3_S1-01_Approval_AR.md) | المراجعة الثانية؛ النص مطابق لنص المكتبة باستثناء نهاية السطر وفق فحص الاسترجاع؛ سجل الاعتماد 25 نوفمبر يثبت الحالة |
+| [S1-01](source/ERP-02_S1-01_Task_Card_AR_v1.md) · [S1-02](source/ERP-02_S1-02_Compatibility_Record_AR.md) | بطاقة معتمدة وسجل توافق |
+| [S1-03](source/ERP-02_S1-03_Task_Card_AR.md) · [إغلاقها](source/ERP-02_G3_S1-03_Closure_AR.md) | بطاقة وسجل إغلاق |
+| [S1-04](source/ERP-02_S1-04_Task_Card_AR.md) · [إغلاقها](source/ERP-02_G3_S1-04_Closure_AR.md) | بطاقة وسجل إغلاق |
+| [S1-05/06](source/ERP-02_S1-05_S1-06_Development_Batch_AR.md) | مراجعة 3؛ النص مطابق للمكتبة باستثناء نهاية السطر؛ PR #9 |
+| [S1-07](source/S1-07_Inventory_Valuation_and_Locations_AR.md) | مراجعة 4؛ نص مقدم من المالك، PR #11؛ دليل الدمج في سجل القرارات |
+| [S1-08/09](source/S1-08_S1-09_Inventory_Batch_AR.md) | مراجعة 2؛ نص مقدم من المالك، PR #13 |
+| [S1-10/11](source/S1-10_S1-11_Printing_and_Internal_API_AR.md) | نص المحادثة المقدم من المالك؛ رقم المراجعة غير مثبت؛ قرار تأجيل الشعار اللاحق نافذ وفق PR #15 |
+| [FIN](source/ERP-02_FIN_10_Policies_AR.md) | مقترحات للمحاسب؛ ليست سياسات موقعة |
 
-| المرجع | النسخة والحالة | المصدر |
-| --- | --- | --- |
-| تصميم Sprint 1 G3 | نسخة مقدمة من المالك، بتاريخ 24 نوفمبر 2026، تحمل عبارة للمراجعة والاعتماد. يطبق اعتماد التصميم والقرارات اللاحقة بحسب سجل القرارات. | [نص G3](source/ERP-02_G3_Sprint_1_Design_AR.md) |
-| دفعة S1-05 وS1-06 | المراجعة 3 المقدمة من المالك؛ دُمج التنفيذ في #9. | [نص الدفعة](source/ERP-02_S1-05_S1-06_Development_Batch_AR.md) · [إغلاق التنفيذ](../decisions_ledger.md) |
-| حالة التنفيذ والقرارات | مراجع GitHub الجارية. | [الحالة](../project_state.md) · [القرارات](../decisions_ledger.md) |
-| أدلة التنفيذ | نتائج GitHub الموثقة ومصفوفة التتبع الأولية. | [القبول](../acceptance_tests.md) · [التتبع](../traceability.md) |
+## مراجع جارية
+[حالة التنفيذ](../project_state.md) · [القرارات التشغيلية اللاحقة](../decisions_ledger.md) · [المتابعات](../open_blockers.md) · [أدلة القبول](../acceptance_tests.md) · [التتبع](../traceability.md) · [خط الأساس والإصدارات](versions.md).
 
-## المصادر المطلوب استكمال نقلها
-
-لم تتوفر محتويات المصادر التالية في بيئة التنفيذ وقت إنشاء الفهرس. تبقى روابطها الأصلية مرجعًا لتحديدها إلى حين إيداع النسخ ومراجعة حالتها.
-
-- [حزمة ERP Handover v1.6](https://chatgpt.com/library?file_id=libfile_fef6c32a42c08191bfd6695ae096d9bf&account_id=personal)
-- [محضر G2](https://chatgpt.com/library?file_id=libfile_b8b659f5b78c8191933b996896b37dc0&account_id=personal)
-- [الدفعة 2A](https://chatgpt.com/library?file_id=libfile_9dd8c589c2b48191adb12c7e7d78aa26&account_id=personal)
-- [الدفعة 2B](https://chatgpt.com/library?file_id=libfile_33c39ef669fc8191ac27329f2e7cea2f&account_id=personal)
-- [تصميم G3 المعتمد، مراجعة 2](https://chatgpt.com/library?file_id=libfile_144c4c780788819184870e4654c3dac9&account_id=personal)؛ يلزم مطابقة الملف المقدم أعلاه مع هذه النسخة.
-- [بطاقة S1-01 v1 المعتمدة، مراجعة 1](https://chatgpt.com/library?file_id=libfile_a63f80b17d7c8191961e845a8ac7cd40&account_id=personal)
-- [سجل الاعتماد](https://chatgpt.com/library?file_id=libfile_5190ae3d4cbc819180f0fd26f0e86817&account_id=personal)
+## حدود المصدر
+تم استرجاع نصوص الملفات العشرة منفردة؛ لم تثبت المطابقة الثنائية مع ZIP. SRS v0.1 المستقل ورسائل الاعتماد الأصلية للمجموعتين الخامسة والعاشرة ناقصة تاريخياً؛ لا يعاد فتح القرارات بسبب ذلك وحده. سجلات قبول S1-01 المحلية والملفات المساندة تُراجع قبل إعلان اكتمال REF-01. لا يعتبر نقل ملف اعتماداً جديداً.
