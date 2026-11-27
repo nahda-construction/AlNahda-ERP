@@ -62,3 +62,8 @@
 
 ## استثناء PR #17 — 27 نوفمبر 2026
 [قرار المالك لمرة واحدة](https://github.com/nahda-construction/AlNahda-ERP/pull/17#issuecomment-7212696910): استثناء Codex Review فقط في الدفعة التوثيقية؛ لا استثناء من المراجعة المستقلة والاستئناف المعزول وCI للرأس النهائي واعتماد الدمج. لا يسري على الدفعات التالية. نتائج الدمج لا تسجل قبل وقوعه.
+
+## إغلاق PR #17 — 27 نوفمبر 2026
+
+- اعتمد المالك معايير REF-01 وDOC-02 وRTM-01 وVER-01 للرأس `559102a67e042806434612f10de23d0d4baedca9`، وقَبِل مراجعة Delta ضمن حدودها وأجّل N-02 وN-03 وN-04. اعتمد كفاية استرجاع معرفة المشروع من GitHub لهذه الدفعة، مع تسجيل أن العزل التقني الكامل للمراجع لم يثبت. [اعتماد المعايير والمراجعة](https://github.com/nahda-construction/AlNahda-ERP/pull/17#issuecomment-7226875020) · [قرار الاستئناف](https://github.com/nahda-construction/AlNahda-ERP/pull/17#issuecomment-7227888098).
+- تطابقت شجرة الدمج عند `d9b2f083d95a12814980b8263f1fb058fc7afc9d` مع الرأس المعتمد ونجحت فحوص main. سجل Codex Review اكتمال مراجعة الرأس بلا ملاحظات بعد الدمج. حُفظت حدود الاستثناء الخاص بهذه الدفعة، وفجوات الأدلة والتأجيلات وبوابتا FIN وSEC. يبقى وسم المرجعية وإذن S1-12 وUI/UX خاضعًا لاعتماد منفصل. [سجل الدمج](https://github.com/nahda-construction/AlNahda-ERP/pull/17#issuecomment-7227911314) · [سجل الإغلاق](https://github.com/nahda-construction/AlNahda-ERP/pull/17#issuecomment-7227945757) · [Codex Review](https://github.com/nahda-construction/AlNahda-ERP/pull/17#issuecomment-7211175276).
