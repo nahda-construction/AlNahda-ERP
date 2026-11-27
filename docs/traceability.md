@@ -36,3 +36,5 @@
 - [S1-01 إلى S1-06](reference/acceptance-trace-s1-01-06.md): 36 معياراً.
 - [S1-07 إلى S1-11](reference/acceptance-trace-s1-07-11.md): 23 معياراً.
 - المجموع 59 معياراً و124 إحالة لتعريفات الاختبارات؛ الإحالات مرشحة للتغطية وليست إثبات كل assertion أو قبول UAT مستقل. [مطابقة Handover](reference/handover-verification.md).
+
+[مراجعة الاتساق والتغطية الدلالية](reference/semantic-review.md): تمييز التنفيذ التأسيسي عن اكتمال المتطلبات الوظيفية؛ لا اعتماد جديد.
