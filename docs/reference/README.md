@@ -1,9 +1,54 @@
-# مراجع S1-01
+# فهرس المرجعية — 27 نوفمبر 2026
 
-- [حزمة ERP Handover v1.6](https://chatgpt.com/library?file_id=libfile_fef6c32a42c08191bfd6695ae096d9bf&account_id=personal)
-- [محضر G2](https://chatgpt.com/library?file_id=libfile_b8b659f5b78c8191933b996896b37dc0&account_id=personal)
-- [الدفعة 2A](https://chatgpt.com/library?file_id=libfile_9dd8c589c2b48191adb12c7e7d78aa26&account_id=personal)
-- [الدفعة 2B](https://chatgpt.com/library?file_id=libfile_33c39ef669fc8191ac27329f2e7cea2f&account_id=personal)
-- [تصميم G3 المعتمد، مراجعة 2](https://chatgpt.com/library?file_id=libfile_144c4c780788819184870e4654c3dac9&account_id=personal)
-- [بطاقة S1-01 v1 المعتمدة، مراجعة 1](https://chatgpt.com/library?file_id=libfile_a63f80b17d7c8191961e845a8ac7cd40&account_id=personal)
-- [سجل الاعتماد](https://chatgpt.com/library?file_id=libfile_5190ae3d4cbc819180f0fd26f0e86817&account_id=personal)
+اقرأ [AGENTS.md](../../AGENTS.md) لترتيب الحجية و[حالة المشروع](../project_state.md) لنقطة الاستئناف. هذا الفهرس مرجع التوجيه الحالي؛ النصوص القديمة تحفظ كما استُرجعت، ولا تعيد فتح بوابات سابقة. الأسرار والبيانات التشغيلية خارج Git.
+
+| المصدر | الإصدار والحجية |
+| --- | --- |
+| [Handover README](handover-v1.6/README.md) | لقطة 22 نوفمبر؛ تعليمات الحالة التاريخية لا تتقدم على حالة المشروع الحالية |
+| [Master SRS](handover-v1.6/master_srs.md) | v0.7؛ تجميع مقترح، القرارات الصريحة نافذة في نطاقها |
+| [القرارات الوظيفية](handover-v1.6/decisions_ledger.md) | v1.6؛ §3 النافذ، §6 التاريخ، §8 التعديل |
+| [قواعد الأعمال والترحيل](handover-v1.6/business_rules_and_posting.md) | v1.6؛ FIN شرط الترحيل الحي |
+| [النموذج المنطقي](handover-v1.6/data_model_schema.md) | v1.6؛ تصميم مقترح لا اعتماد فيزيائي شامل |
+| [القاموس](handover-v1.6/domain_glossary.md) | v1.6؛ مرجع مصطلحات |
+| [سير العمل والأمان](handover-v1.6/workflows_and_security.md) | v1.6؛ SEC شرط الوصول الخارجي |
+| [الفجوات الوظيفية](handover-v1.6/open_blockers.md) | v1.6؛ تُغلق وفق بواباتها |
+| [اختبارات القبول وRTM](handover-v1.6/acceptance_tests.md) | v1.6؛ 241 معرفاً؛ سيناريوهات مقترحة لا نتائج تنفيذ |
+| [حالة Handover التاريخية](handover-v1.6/project_state.md) | v1.6؛ لا تحدد نقطة الاستئناف الحالية |
+| [G2 closure](source/ERP-02_G2_Closure_AR.md) · [2A](source/ERP-02_G2_2A_AR.md) · [2B](source/ERP-02_G2_2B_AR.md) | إغلاق G2 وتصحيحات التخطيط النافذة |
+| [G3](source/ERP-02_G3_Sprint_1_Design_AR.md) · [اعتماده](source/ERP-02_G3_S1-01_Approval_AR.md) | سجل الاعتماد ينسب المراجعة 2؛ مطابقة النص المسترجع قبل تنقية الروابط لا تثبت مطابقته للنسخة المعتمدة تاريخياً |
+| [S1-01](source/ERP-02_S1-01_Task_Card_AR_v1.md) · [S1-02](source/ERP-02_S1-02_Compatibility_Record_AR.md) | بطاقة معتمدة وسجل توافق |
+| [S1-03](source/ERP-02_S1-03_Task_Card_AR.md) · [إغلاقها](source/ERP-02_G3_S1-03_Closure_AR.md) | بطاقة وسجل إغلاق |
+| [S1-04](source/ERP-02_S1-04_Task_Card_AR.md) · [إغلاقها](source/ERP-02_G3_S1-04_Closure_AR.md) | بطاقة وسجل إغلاق |
+| [S1-05/06](source/ERP-02_S1-05_S1-06_Development_Batch_AR.md) | مراجعة 3؛ النص مطابق للمكتبة باستثناء نهاية السطر؛ PR #9 |
+| [S1-07](source/S1-07_Inventory_Valuation_and_Locations_AR.md) | مراجعة 4؛ نص مقدم من المالك، PR #11؛ دليل الدمج في سجل القرارات |
+| [S1-08/09](source/S1-08_S1-09_Inventory_Batch_AR.md) | مراجعة 2؛ نص مقدم من المالك، PR #13 |
+| [S1-10/11](source/S1-10_S1-11_Printing_and_Internal_API_AR.md) | نص المحادثة المقدم من المالك؛ رقم المراجعة غير مثبت؛ قرار تأجيل الشعار اللاحق نافذ وفق PR #15 |
+| [FIN](source/ERP-02_FIN_10_Policies_AR.md) | مقترحات للمحاسب؛ ليست سياسات موقعة |
+
+## مراجع جارية
+[حالة التنفيذ](../project_state.md) · [القرارات التشغيلية اللاحقة](../decisions_ledger.md) · [المتابعات](../open_blockers.md) · [أدلة القبول](../acceptance_tests.md) · [التتبع](../traceability.md) · [خط الأساس والإصدارات](versions.md).
+
+## حدود المصدر
+استُرجع ZIP الأصلي واجتاز CRC؛ طابقت بصمات Git blob للملفات العشرة النشطة أصول ZIP بعد استعادة محرف نهاية الملف. مجلدا review وsource_original تاريخيان اختياريان وفق README الحزمة ولا يدخلان في اللقطة النشطة. SRS v0.1 المستقل ورسائل الاعتماد الأصلية للمجموعتين الخامسة والعاشرة ناقصة تاريخياً؛ لا يعاد فتح القرارات بسبب ذلك وحده. استُرجعت سجلات القبول المحلية لـ S1-01/02 وأودعت نصوصها في المرجعية. لا يعتبر نقل ملف اعتماداً جديداً.
+
+## مصفوفتا القبول الفردي
+
+- [S1-01 إلى S1-06](acceptance-trace-s1-01-06.md): 36 معياراً.
+- [S1-07 إلى S1-11](acceptance-trace-s1-07-11.md): 23 معياراً.
+- المجموع 59 معياراً و124 إحالة لتعريفات الاختبارات؛ الإحالات مرشحة للتغطية وليست إثبات كل assertion أو قبول UAT مستقل. [مطابقة Handover](handover-verification.md).
+
+## سجلات التشغيل المسترجعة
+المصدر الوحيد لقائمة سجلات التشغيل التاريخية: [أدلة القبول](../acceptance_tests.md).
+
+[مراجعة الاتساق والتغطية الدلالية](semantic-review.md): تمييز التنفيذ التأسيسي عن اكتمال المتطلبات الوظيفية؛ لا اعتماد جديد.
+
+## نقطة الدخول الحالية
+[اقرأ أولاً](00-READ-FIRST.md) · [متابعة المراجعة المستقلة](review-disposition-pr17.md). حجية الصف النافذ بحسب حالته وترتيب AGENTS، لا اعتماد شامل للّقطة المقترحة.
+
+[معايير قبول الدفعة](batch-acceptance-pr17.md) · [جسر التتبع الحي](sprint1-requirement-bridge.md).
+
+النسخ العامة تحت source عُدلت روابطها الخاصة دون تغيير قواعد الأعمال. لا ادعاء مطابقة بايتية لهذه النسخ بعد تنقية الروابط؛ لا تغيير لبصمات Handover العشرة. إزالة الروابط من الرأس لا تمحوها من التاريخ. المراجع الخاصة غير المودعة مبينة نصياً؛ لا إذن جديد لنشر بيانات تجارية.
+
+[سجل مراجعة المعايير الـ59](semantic-acceptance-59.md).
+
+[متابعة الأدلة التفصيلية وبطاقات الفجوات](semantic-evidence-followup.md): مراجعة مساعدات السباق والتراجع وتقارير PR #9/11/13/15؛ لا قبول مستقل ولا تنفيذ بطاقات جديدة.
