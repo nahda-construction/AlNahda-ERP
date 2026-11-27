@@ -40,3 +40,5 @@
 [مراجعة الاتساق والتغطية الدلالية](reference/semantic-review.md): تمييز التنفيذ التأسيسي عن اكتمال المتطلبات الوظيفية؛ لا اعتماد جديد.
 
 [معايير قبول الدفعة](reference/batch-acceptance-pr17.md) · [جسر التتبع الحي](reference/sprint1-requirement-bridge.md).
+
+[سجل مراجعة المعايير الـ59](reference/semantic-acceptance-59.md).
