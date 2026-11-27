@@ -1,6 +1,6 @@
-# حالة مشروع ERP في 26 نوفمبر 2026
+# حالة مشروع ERP في 27 نوفمبر 2026
 
-أُغلقت دفعة S1-08 وS1-09 على `main` عند التزام الدمج `ee3dd28b13e9a8a480c74fe608886aa741057d75`. تخضع المتطلبات الوظيفية لمراجع Handover v1.6 وترتيب الحجية في `AGENTS.md`. [طلب السحب #13](https://github.com/nahda-construction/AlNahda-ERP/pull/13)
+دُمجت دفعة S1-10 وS1-11 على `main` عند `a274aadbacd1a41a715d684ba6c3a3fca86d4603`. تخضع المتطلبات الوظيفية لمراجع Handover v1.6 وترتيب الحجية في `AGENTS.md`. [طلب السحب #15](https://github.com/nahda-construction/AlNahda-ERP/pull/15)
 
 | البطاقة | الحالة والدليل |
 | --- | --- |
@@ -17,6 +17,8 @@
 | S1-07 | اكتملت مجموعات تقييم المخزون والمواقع وأرصدة المواقع في `b2baa99`. دُمجت عبر [PR #11](https://github.com/nahda-construction/AlNahda-ERP/pull/11). |
 | S1-08 | دُمجت الحركة الافتتاحية الاصطناعية، وقيود السند والحركة والتدقيق، واختبارات التراجع والصيانة ومنح التشغيل في الالتزام `811f52f` عبر [#13](https://github.com/nahda-construction/AlNahda-ERP/pull/13). |
 | S1-09 | دُمج اعتماد الصرف المتزامن بترتيب أقفال ثابت وإعادة التحقق من الصلاحية والمتاح في الالتزام `7b36098` عبر [#13](https://github.com/nahda-construction/AlNahda-ERP/pull/13). |
+| S1-10 | دُمجت الطباعة العربية الداخلية وعامل Chromium المعزول، مع قفل مشترك وتعافٍ بعد الفشل، في الالتزام `e8e4119`. يظهر اسم الشركة في المستند وفق قرار تأجيل الشعار المعتمد. [#15](https://github.com/nahda-construction/AlNahda-ERP/pull/15) |
+| S1-11 | دُمجت واجهة Django Ninja الداخلية ووثائق OpenAPI المحمية وحفظ إيصال الإنشاء وعزل مضيف المالك المحاكى في الالتزام `254c14f`. [#15](https://github.com/nahda-construction/AlNahda-ERP/pull/15) |
 
 اجتازت ERP-02 الاختبارات الـ66 على PostgreSQL 18.7، مع إثبات التهيئة والترقية والرجوع وفصل الأدوار في بيئتي Compose معزولتين. اجتاز `main` فحص PostgreSQL 18 بعد الدمج. [أدلة قبول الدفعة](https://github.com/nahda-construction/AlNahda-ERP/pull/9#issuecomment-7173434970) · [GitHub Actions بعد الدمج](https://github.com/nahda-construction/AlNahda-ERP/actions/runs/45698042533/job/139500514695)
 
@@ -24,6 +26,8 @@
 
 اجتازت دفعة S1-08 وS1-09 على `main` بعد الدمج 115 اختبارًا على PostgreSQL 18.7 وفحوص Django والترحيلات والأسرار. في اختبار UAT-DB-02 اعتُمد طلب صرف واحد من طلبين متزامنين لصرف 7 من رصيد 10، وبقي الرصيد 3 في كلا الترتيبين. [أدلة القبول](https://github.com/nahda-construction/AlNahda-ERP/pull/13) · [GitHub Actions بعد الدمج](https://github.com/nahda-construction/AlNahda-ERP/actions/runs/45739290887/job/139640061381)
 
-نقطة الاستئناف هي إعداد تصميم S1-10 للطباعة الداخلية وتحديد الدفعة التالية ومعايير قبولها ضمن G3 قبل طلب اعتماد التنفيذ.
+اجتازت دفعة S1-10 وS1-11 على `main` بعد الدمج 135 اختبارًا على PostgreSQL 18.7 وفحوص Django والترحيلات والأسرار. في اختبار الطباعة سجّل Docker إنهاءً فعليًا بسبب نفاد الذاكرة عند حد 96 MiB. أعادت الطباعة `503` مع استمرار الويب وPostgreSQL، ثم نجحت عند استعادة حد 1 GiB. [فحص PostgreSQL](https://github.com/nahda-construction/AlNahda-ERP/actions/runs/45943900808/job/140324108623) · [فحص الطباعة وذاكرة الحاوية](https://github.com/nahda-construction/AlNahda-ERP/actions/runs/45943900808/job/140324108879)
+
+نقطة الاستئناف هي إعداد الدفعة التالية ضمن G3 بدءًا من S1-12 لتجربة Staging الداخلية عبر LAN، وتحديد تبعياتها ومعايير قبولها قبل طلب اعتماد التنفيذ.
 
 يسجل DEV-ENV-01 نجاح Docker من Ubuntu ونجاح تجربة إنشاء فرع محلي وحذفه باستخدام `--approve-for-me` وفق تقرير البيئة. أثبت تقرير البيئة السحابية تشغيل Compose وPostgreSQL 18.7 و30 اختباراً؛ تشغيل Docker داخل Codex المحلي ليس شرطاً للمسار السحابي الحالي. راجع [المتابعات](open_blockers.md).
