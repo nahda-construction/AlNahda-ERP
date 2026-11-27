@@ -38,3 +38,5 @@
 - المجموع 59 معياراً و124 إحالة لتعريفات الاختبارات؛ الإحالات مرشحة للتغطية وليست إثبات كل assertion أو قبول UAT مستقل. [مطابقة Handover](reference/handover-verification.md).
 
 [مراجعة الاتساق والتغطية الدلالية](reference/semantic-review.md): تمييز التنفيذ التأسيسي عن اكتمال المتطلبات الوظيفية؛ لا اعتماد جديد.
+
+[معايير قبول الدفعة](reference/batch-acceptance-pr17.md) · [جسر التتبع الحي](reference/sprint1-requirement-bridge.md).
