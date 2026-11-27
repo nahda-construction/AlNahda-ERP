@@ -17,6 +17,6 @@
 | PR #6 | head `daaad71948b94967b648bc64726cc736441d4901`؛ CI [45625570893](https://github.com/nahda-construction/AlNahda-ERP/actions/runs/45625570893)، مراجعة Codex مكتملة بلا ملاحظات، التصحيح تحقق من الدالة الاصطناعية؛ مغلق دون دمج. تقرير Cloud: 30 اختباراً على PostgreSQL 18.7. |
 | PR #7 | head `96677d47ec3ff40bce5b1f6e55d23ae9f227ba22`؛ CI [45627127910](https://github.com/nahda-construction/AlNahda-ERP/actions/runs/45627127910)، مراجعة مكتملة بلا ملاحظات، دمج `bf7c3f31`؛ [دليل القبول](https://github.com/nahda-construction/AlNahda-ERP/pull/7#issuecomment-7164383093). اختبار دمج إيجابي لا اختبار رفض. |
 | CLEAN-01 | تعديل وثائق فقط؛ لا Migration. دليل قبول هذه الدفعة في PR الخاص بها بعد CI والمراجعة والدمج. |
-| S1-05 | لم تُنفذ؛ معايير القبول المعتمدة في البطاقة والمواصفات، لا تعتبر الاختبارات السابقة قبولاً لها. |
+| S1-05 وS1-06 | دُمجتا عبر [#9](https://github.com/nahda-construction/AlNahda-ERP/pull/9)، واجتاز main فحص PostgreSQL 18 بعد الدمج. [النتيجة](https://github.com/nahda-construction/AlNahda-ERP/actions/runs/45698042533/job/139500514695) |
 
 هذا الملف أدلة التنفيذ لا بديل عن RTM واختبارات UAT في Handover.
