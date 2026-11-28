@@ -1,0 +1,57 @@
+map $host $staging_authority {
+    default "";
+    ${ERP_STAGING_INTERNAL_HOST} ${ERP_STAGING_INTERNAL_HOST}${ERP_STAGING_HTTPS_AUTHORITY_SUFFIX};
+    ${ERP_STAGING_OWNER_HOST} ${ERP_STAGING_OWNER_HOST}${ERP_STAGING_HTTPS_AUTHORITY_SUFFIX};
+}
+
+map $host $staging_is_owner {
+    default 0;
+    ${ERP_STAGING_OWNER_HOST} 1;
+}
+
+map "$staging_is_owner:$uri" $staging_internal_path_blocked {
+    default 0;
+    ~^1:/(employees|api|admin)(/|$) 1;
+}
+
+server {
+    listen ${ERP_STAGING_NGINX_LISTEN} ssl default_server;
+    server_name _;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_reject_handshake on;
+    return 404;
+}
+
+server {
+    listen ${ERP_STAGING_NGINX_LISTEN} ssl;
+    server_name ${ERP_STAGING_INTERNAL_HOST} ${ERP_STAGING_OWNER_HOST};
+    ssl_certificate ${ERP_STAGING_TLS_CERT};
+    ssl_certificate_key ${ERP_STAGING_TLS_KEY};
+    ssl_protocols TLSv1.2 TLSv1.3;
+
+    if ($staging_authority = "") { return 404; }
+    if ($http_host = "") { return 404; }
+    if ($ssl_server_name != $host) { return 404; }
+    if ($staging_internal_path_blocked) { return 404; }
+
+    # Allow the application's 5 MiB PDF plus the multipart envelope and form fields.
+    client_max_body_size 6m;
+
+    location / {
+        proxy_pass http://${ERP_STAGING_UPSTREAM};
+        proxy_http_version 1.1;
+        proxy_pass_request_headers off;
+        proxy_set_header Connection "";
+        proxy_set_header Host $staging_authority;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_set_header Cookie $http_cookie;
+        proxy_set_header Origin $http_origin;
+        proxy_set_header Referer $http_referer;
+        proxy_set_header Content-Type $content_type;
+        proxy_set_header X-CSRFToken $http_x_csrftoken;
+        proxy_set_header Idempotency-Key $http_idempotency_key;
+        proxy_set_header Accept $http_accept;
+        proxy_set_header Accept-Language $http_accept_language;
+        proxy_set_header User-Agent $http_user_agent;
+    }
+}

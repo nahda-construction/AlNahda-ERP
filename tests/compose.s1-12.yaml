@@ -1,0 +1,113 @@
+x-run-labels: &run-labels
+  org.alnahda.s1-12-run: ${ERP_S1_12_TOKEN:?Set the acceptance run ownership token}
+
+x-client: &client
+  image: ${ERP_STAGING_APP_IMAGE:?Set the preloaded staging app image}
+  pull_policy: never
+  labels: *run-labels
+  environment:
+    HOME: /tmp/s1-12-home
+  command:
+    - sh
+    - -ec
+    - |
+      mkdir -p "$$HOME/.pki/nssdb"
+      cp -R /run/staging/nssdb/. "$$HOME/.pki/nssdb"
+      exec sleep infinity
+  tmpfs:
+    - /tmp:mode=1777
+  shm_size: 256m
+  volumes:
+    - ${ERP_S1_12_ROOT:?Set the private acceptance run path}/nssdb:/run/staging/nssdb:ro
+  healthcheck:
+    test: [CMD-SHELL, 'test -s "$$HOME/.pki/nssdb/cert9.db"']
+    interval: 2s
+    timeout: 2s
+    retries: 5
+
+services:
+  db:
+    labels: *run-labels
+
+  web:
+    labels: *run-labels
+    ports: !reset []
+    networks: !override [database, printing, proxy_backend, web_egress]
+
+  printer:
+    labels: *run-labels
+
+  migrate:
+    labels: *run-labels
+
+  proxy:
+    image: ${ERP_S1_12_NGINX_IMAGE:?Set the preloaded acceptance Nginx image}
+    pull_policy: never
+    labels: *run-labels
+    environment:
+      NGINX_ENVSUBST_FILTER: ^ERP_STAGING_
+      ERP_STAGING_INTERNAL_HOST: ${ERP_STAGING_INTERNAL_HOST:?Set the staging staff DNS name}
+      ERP_STAGING_OWNER_HOST: ${ERP_STAGING_OWNER_HOST:?Set the simulated owner DNS name}
+      ERP_STAGING_NGINX_LISTEN: '8443'
+      ERP_STAGING_HTTPS_AUTHORITY_SUFFIX: ':8443'
+      ERP_STAGING_TLS_CERT: /run/staging/tls/server.crt
+      ERP_STAGING_TLS_KEY: /run/staging/tls/server.key
+      ERP_STAGING_UPSTREAM: web:8000
+    volumes:
+      - ./ops/staging/nginx.conf.template:/etc/nginx/templates/default.conf.template:ro
+      - ${ERP_S1_12_ROOT:?Set the private acceptance run path}/tls:/run/staging/tls:ro
+    networks:
+      lan:
+        aliases:
+          - ${ERP_STAGING_INTERNAL_HOST:?Set the staging staff DNS name}
+          - ${ERP_STAGING_OWNER_HOST:?Set the simulated owner DNS name}
+      proxy_backend:
+    depends_on:
+      web:
+        condition: service_healthy
+
+  client-a:
+    <<: *client
+    networks: [lan, client_a_egress]
+
+  client-b:
+    <<: *client
+    networks: [lan, client_b_egress]
+
+  outside:
+    image: ${ERP_STAGING_APP_IMAGE:?Set the preloaded staging app image}
+    pull_policy: never
+    labels: *run-labels
+    command: [python, -m, http.server, '8080', --directory, /tmp]
+    networks: [web_egress, client_a_egress, client_b_egress]
+
+volumes:
+  pgdata:
+    labels: *run-labels
+  privatefiles:
+    labels: *run-labels
+  printlock:
+    labels: *run-labels
+
+networks:
+  frontend:
+    labels: *run-labels
+  database:
+    labels: *run-labels
+  printing:
+    labels: *run-labels
+  lan:
+    internal: true
+    labels: *run-labels
+  proxy_backend:
+    internal: true
+    labels: *run-labels
+  web_egress:
+    internal: true
+    labels: *run-labels
+  client_a_egress:
+    internal: true
+    labels: *run-labels
+  client_b_egress:
+    internal: true
+    labels: *run-labels

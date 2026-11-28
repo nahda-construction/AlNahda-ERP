@@ -1,0 +1,38 @@
+name: erp-staging
+
+x-staging-app: &staging-app
+  image: ${ERP_STAGING_APP_IMAGE:?Set the preloaded staging app image}
+  pull_policy: never
+
+services:
+  db:
+    image: ${ERP_STAGING_DB_IMAGE:?Set the preloaded PostgreSQL 18 image}
+    pull_policy: never
+
+  web:
+    <<: *staging-app
+    build: !reset null
+    environment:
+      DJANGO_SETTINGS_MODULE: config.staging_settings
+      ERP_STAGING_INTERNAL_HOST: ${ERP_STAGING_INTERNAL_HOST:?Set the staging staff DNS name}
+      ERP_STAGING_OWNER_HOST: ${ERP_STAGING_OWNER_HOST:?Set the simulated owner DNS name}
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - |
+          import os
+          from urllib.request import Request, urlopen
+          request = Request("http://127.0.0.1:8000/healthz/", headers={
+              "Host": os.environ["ERP_STAGING_INTERNAL_HOST"], "X-Forwarded-Proto": "https",
+          })
+          urlopen(request, timeout=4).close()
+
+  printer:
+    <<: *staging-app
+    build: !reset null
+
+  migrate:
+    <<: *staging-app
+    build: !reset null
