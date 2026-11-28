@@ -72,6 +72,7 @@ def ledger(title):
         "references": list(documents.values_list("document_no", flat=True)),
         "attachment_sha256": list(attachments.values_list("sha256", flat=True)),
         "attachment_names": list(attachments.values_list("original_name", flat=True)),
+        "receipt_state": list(receipts.values_list("status", flat=True)),
         "receipt_status": list(receipts.values_list("response_status", flat=True)),
         "receipt_locations": [value["location"] for value in receipts.values_list("response_body", flat=True)],
     }
@@ -376,7 +377,7 @@ def permissions(page, internal, owner, state, actor):
 
     def foreign_origin(route):
         if is_submission(route.request, create_path):
-            route.continue_(headers={**route.request.headers, "origin": owner})
+            route.continue_(headers={**route.request.all_headers(), "origin": owner})
         else:
             route.continue_()
 
@@ -459,7 +460,10 @@ def main():
     internal = origin(os.environ["ERP_STAGING_INTERNAL_HOST"], port)
     owner = origin(os.environ["ERP_STAGING_OWNER_HOST"], port)
     with sync_playwright() as playwright:
-        browser = playwright.chromium.launch(executable_path="/usr/bin/chromium", args=["--disable-background-networking"])
+        browser = playwright.chromium.launch(
+            executable_path="/usr/bin/chromium", args=["--disable-background-networking"],
+            ignore_default_args=["--disable-back-forward-cache"],
+        )
         context = browser.new_context(ignore_https_errors=False)
         used_origins = set()
         def record_origin(request):

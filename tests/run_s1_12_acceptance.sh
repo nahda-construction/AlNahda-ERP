@@ -73,8 +73,7 @@ verify_config() {
     and all(.services[];
       owned and (has("container_name") | not) and (has("network_mode") | not)
       and (.privileged != true) and (has("pid") | not) and (has("ipc") | not)
-      and all(.ports[]?; .host_ip == "127.0.0.1" and
-        ((.published // "0") | tostring) == "0")
+      and ((.ports // []) | length) == 0
       and all(.volumes[]?; .type == "volume" or .type == "tmpfs" or
         (.type == "bind" and
           ((.source | startswith($root + "/")) or (.source == $template and .read_only == true)))))
@@ -192,7 +191,7 @@ with tempfile.TemporaryDirectory(prefix="s112-check-", dir=parent) as evidence:
         success, _, ok_root = fixture("success", 0)
         failure, _, fail_root = fixture("failure", 37)
         assert ok_root != fail_root
-        assert (ok_root / "fixture-port").read_text() != (fail_root / "fixture-port").read_text()
+        assert (ok_root / "fixture-port").read_text() == (fail_root / "fixture-port").read_text() == ""
         release(ok_root)
         checked(success, ok_root, 0)
         subprocess.run(["docker", "volume", "inspect", f"{fail_root.name}_pgdata"],
@@ -303,9 +302,9 @@ touch "$scratch/cleanup-armed"
 verify_config
 if [[ -n "$exercise" ]]; then
   compose create --no-build db
-  proxy_fixture=$(compose run --service-ports --no-deps -d proxy sleep 180)
-  docker port "$proxy_fixture" 8443 > "$scratch/fixture-port"
-  grep -Eq '^127\.0\.0\.1:[1-9][0-9]+$' "$scratch/fixture-port"
+  proxy_fixture=$(compose run --no-deps -d proxy sleep 180)
+  docker port "$proxy_fixture" > "$scratch/fixture-port"
+  [[ ! -s "$scratch/fixture-port" ]]
   owned_resources owned
   touch "$scratch/fixture-ready"
   deadline=$((SECONDS+80))
@@ -344,22 +343,35 @@ compose run --rm --no-deps -T -e "S1_12_PASSWORD_A=$S1_12_PASSWORD_A" -e "S1_12_
   python manage.py shell --verbosity 0 -c 'from tests.s1_12_acceptance import seed; seed()'
 compose up -d --no-build --wait web printer proxy client-a client-b outside
 owned_resources owned
-for service in db web printer outside client-a client-b; do
+for service in db web printer proxy outside client-a client-b; do
   [[ -z "$(docker port "$(compose ps -q "$service")")" ]]
 done
-docker port "$(compose ps -q proxy)" 8443 | grep -E '^127\.0\.0\.1:[1-9][0-9]+$'
+printf 'S1-12: no test container publishes a host port\n'
 
 probe() {
   local actor=$1 action=$2
   shift 2
-  compose exec -T "client-$actor" python -m tests.s1_12_acceptance "$action" --actor "$actor" "$@"
+  local password_key="S1_12_PASSWORD_${actor^^}"
+  compose exec -T -e "ERP_STAGING_INTERNAL_HOST=$ERP_STAGING_INTERNAL_HOST" \
+    -e "ERP_STAGING_OWNER_HOST=$ERP_STAGING_OWNER_HOST" -e "$password_key=${!password_key}" \
+    "client-$actor" python -m tests.s1_12_acceptance "$action" --actor "$actor" "$@"
 }
 
 ledger() {
-  local scenario=$1
+  local scenario=$1 expected=$2 counts first=
   case "$scenario" in S1-12-A04a|S1-12-A04b) ;; *) return 2 ;; esac
-  compose run --rm --no-deps -T migrate python manage.py shell --verbosity 0 \
-    -c "from tests.s1_12_acceptance import ledger; ledger('$scenario')"
+  counts=$(compose run --rm --no-deps -T migrate python manage.py shell --verbosity 0 \
+    -c "from tests.s1_12_acceptance import ledger; ledger('$scenario')") || return 1
+  printf '%s\n' "$counts"
+  if [[ "$scenario" == S1-12-A04b ]]; then
+    first=$(compose exec -T client-a cat /tmp/s1-12-state/a04b-first.json) || return 1
+  fi
+  jq -e --argjson expected "$expected" --argjson first "${first:-null}" '
+    ([.documents, .attachments, .events, .receipts] | all(. == $expected))
+    and ($expected == 0 or (.receipt_state == ["COMPLETED"] and .receipt_status == [303]))
+    and ($first == null or ($first.status == 303 and .receipt_locations == [$first.location]
+      and .attachment_sha256 == [$first.attachment_sha256]))
+  ' >/dev/null <<<"$counts"
 }
 
 escape() {
@@ -400,8 +412,8 @@ data_flow() {
   probe b store &&
   compose cp client-a:/tmp/s1-12-state/flow-a.json "$scratch/flow-a.json" &&
   compose cp client-b:/tmp/s1-12-state/flow-b.json "$scratch/flow-b.json" &&
-  compose cp "$scratch/flow-a.json" client-b:/tmp/s1-12-state/peer-a.json &&
-  compose cp "$scratch/flow-b.json" client-a:/tmp/s1-12-state/peer-b.json &&
+  compose exec -T client-b sh -c 'cat > /tmp/s1-12-state/peer-a.json' < "$scratch/flow-a.json" &&
+  compose exec -T client-a sh -c 'cat > /tmp/s1-12-state/peer-b.json' < "$scratch/flow-b.json" &&
   probe a cross --peer /tmp/s1-12-state/peer-b.json &&
   probe b cross --peer /tmp/s1-12-state/peer-a.json
 }
@@ -457,7 +469,7 @@ before_save() {
     disconnected=1
     if compose exec -T client-a touch /tmp/s1-12-state/a04a-cut &&
         wait_file client-a /tmp/s1-12-state/a04a-failed.json &&
-        probe b login && ledger S1-12-A04a; then
+        probe b login && ledger S1-12-A04a 0; then
       :
     else
       status=1
@@ -470,6 +482,7 @@ before_save() {
   fi
   compose exec -T client-a touch /tmp/s1-12-state/a04a-resume || status=1
   wait "$browser" || status=$?
+  if ((status == 0)); then ledger S1-12-A04a 1 || status=1; fi
   return "$status"
 }
 
@@ -478,14 +491,14 @@ after_save() {
   probe a a04b &
   browser=$!
   if wait_file client-a /tmp/s1-12-state/a04b-first.json &&
-      ledger S1-12-A04b &&
+      ledger S1-12-A04b 1 &&
       compose exec -T client-a touch /tmp/s1-12-state/a04b-commit; then
     :
   else
     status=1
   fi
   wait "$browser" || status=$?
-  ledger S1-12-A04b || status=1
+  ledger S1-12-A04b 1 || status=1
   return "$status"
 }
 
@@ -504,6 +517,7 @@ record A02 data_flow
 record A03 printing
 record A04a before_save
 record A04b after_save
-record A06 probe a permissions
+permissions() { probe a permissions && probe b permissions; }
+record A06 permissions
 record A07 restart_flow
 exit "$result"

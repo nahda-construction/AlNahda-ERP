@@ -54,11 +54,6 @@ services:
       ERP_STAGING_TLS_CERT: /run/staging/tls/server.crt
       ERP_STAGING_TLS_KEY: /run/staging/tls/server.key
       ERP_STAGING_UPSTREAM: web:8000
-    ports:
-      - target: 8443
-        published: '0'
-        host_ip: 127.0.0.1
-        protocol: tcp
     volumes:
       - ./ops/staging/nginx.conf.template:/etc/nginx/templates/default.conf.template:ro
       - ${ERP_S1_12_ROOT:?Set the private acceptance run path}/tls:/run/staging/tls:ro
