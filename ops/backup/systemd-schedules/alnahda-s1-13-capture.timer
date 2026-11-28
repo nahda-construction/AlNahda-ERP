@@ -1,0 +1,9 @@
+[Unit]
+Description=Capture AlNahda S1-13 Staging backup every twelve hours
+
+[Timer]
+OnCalendar=*-*-* 00,12:00:00 UTC
+Persistent=true
+
+[Install]
+WantedBy=timers.target
