@@ -89,3 +89,34 @@ jobs:
           fi
       - name: Verify printer cgroup OOM and recovery
         run: bash tests/run_s1_10_cgroup_acceptance.sh
+
+  staging-acceptance:
+    name: S1-12 automated Staging acceptance
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Ensure certificate tooling is available
+        run: |
+          if ! command -v certutil >/dev/null || ! command -v pdftotext >/dev/null; then
+            sudo apt-get update
+            sudo apt-get install -y --no-install-recommends libnss3-tools poppler-utils
+          fi
+      - name: Verify isolated cleanup lifecycle
+        run: bash tests/run_s1_12_acceptance.sh --lifecycle-check
+      - name: Run isolated Staging acceptance
+        run: |
+          export S1_12_EVIDENCE_DIR="$RUNNER_TEMP/s112-evidence"
+          bash tests/run_s1_12_acceptance.sh --run-pointer "$RUNNER_TEMP/s112-run-pointer"
+      - name: Verify test resource cleanup
+        if: always()
+        run: bash tests/run_s1_12_acceptance.sh --cleanup "$RUNNER_TEMP/s112-run-pointer"
+      - name: Keep synthetic browser evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: s1-12-browser-evidence
+          path: ${{ runner.temp }}/s112-evidence
+          if-no-files-found: ignore
