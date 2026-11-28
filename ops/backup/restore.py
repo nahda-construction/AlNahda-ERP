@@ -26,11 +26,6 @@ FINGERPRINT = re.compile(r"[0-9a-f]{64}\Z")
 STORAGE_KEY = re.compile(r"[0-9a-f]{32}\.pdf\Z")
 EVIDENCE_KEYS = ("postgres", "migrations", "counts", "control_totals", "attachments")
 APP_VOLUMES = ("pgdata", "privatefiles", "printlock")
-PROBE_TABLES = {
-    "test_transactions_testtransaction",
-    "test_transactions_auditevent",
-    "test_transactions_idempotencyrecord",
-}
 
 
 OWNER_SQL = """
@@ -123,11 +118,10 @@ BEGIN
     EXCEPTION WHEN insufficient_privilege THEN
         NULL;
     END;
-    PERFORM set_config('erp.restore_probe_id', probe_uuid::text, true);
 END
 $probe$;
-SELECT json_build_object('runtime_role', current_user, 'id', current_setting('erp.restore_probe_id'));
-COMMIT;
+SELECT current_user;
+ROLLBACK;
 """
 
 
@@ -244,7 +238,7 @@ def verify_bundle(repository, snapshot, cut, fingerprint, directory, synthetic):
 
 
 class Destination:
-    def __init__(self, config, *, synthetic):
+    def __init__(self, config):
         self.project = config["project"]
         source = config["source_project"]
         if not PROJECT.fullmatch(self.project) or not PROJECT.fullmatch(source) or source == self.project:
@@ -268,6 +262,11 @@ class Destination:
                 raise BackupError(f"Unsafe mount in target service {name}")
         if "ports" in services["db"] or not plan["networks"]["database"].get("internal"):
             raise BackupError("Target database must remain on its private network")
+        if services["printer"].get("ports"):
+            raise BackupError("Target print service cannot publish a host port")
+        web_ports = services["web"].get("ports", [])
+        if len(web_ports) != 1 or web_ports[0].get("host_ip") not in ("127.0.0.1", "::1"):
+            raise BackupError("Restored Staging can publish its web service only on loopback")
         for network in plan["networks"].values():
             if network.get("external") or not network["name"].startswith(self.project + "_"):
                 raise BackupError("Target Compose networks must be project-local")
@@ -276,9 +275,7 @@ class Destination:
             raise BackupError("Target Compose does not mount its private attachment volume")
 
         origin_filter = f"label=com.docker.compose.project={source}"
-        if self.docker_call("Checking source isolation", "ps", "-q", "--filter", origin_filter).strip():
-            raise BackupError("Source Compose containers are still reachable on the target Docker host")
-        if not synthetic and (
+        if (
             self.docker_call("Checking source containers", "ps", "-aq", "--filter", origin_filter).strip()
             or self.docker_call("Checking source volumes", "volume", "ls", "-q", "--filter", origin_filter).strip()
         ):
@@ -426,47 +423,31 @@ class Destination:
         evidence_sql = DATABASE_EVIDENCE_SQL.decode() if isinstance(DATABASE_EVIDENCE_SQL, bytes) else DATABASE_EVIDENCE_SQL
         if json.loads(self.owner_sql(evidence_sql)) != expected:
             raise BackupError("Restored PostgreSQL evidence does not match the manifest")
-        counts = expected["counts"].copy()
-        probe_keys = {name for name in counts if name.rsplit(".", 1)[-1] in PROBE_TABLES}
-        if len(probe_keys) != len(PROBE_TABLES):
-            raise BackupError("Manifest is missing the tables required for the runtime write proof")
-        probe = json.loads(self.runtime_sql(RUNTIME_PROBE_SQL))
-        if probe["runtime_role"] != self.runtime:
-            raise BackupError("Authorized runtime write or negative privilege checks failed")
-        confirmation = self.owner_sql(
-            """SELECT EXISTS (
-                    SELECT 1 FROM public.test_transactions_testtransaction document
-                    JOIN public.test_transactions_auditevent event ON event.test_transaction_id = document.id
-                    JOIN public.test_transactions_idempotencyrecord receipt ON receipt.test_transaction_id = document.id
-                    WHERE document.id = :'probe_uuid'::uuid AND document.status = 'DRAFT'
-                        AND event.event_type = 'CREATED' AND receipt.status = 'COMPLETED'
-                        AND event.project_id = document.project_id AND receipt.project_id = document.project_id
-                        AND event.actor_id = document.created_by_id AND receipt.actor_id = document.created_by_id
-                );""",
-            "-v", f'probe_uuid={probe["id"]}',
-        )
-        if confirmation.decode().strip() != "t":
-            raise BackupError("An independent connection could not confirm the committed runtime write")
-        for name in probe_keys:
-            counts[name] += 1
-        if json.loads(self.owner_sql(evidence_sql)) != (expected | {"counts": counts}):
-            raise BackupError("Committed runtime proof affected unexpected restored control totals")
-        return owner | {"runtime_role": self.runtime, "authorized_write_probe_committed_id": probe["id"]}
+        if self.runtime_sql(RUNTIME_PROBE_SQL).decode().strip() != self.runtime:
+            raise BackupError("Independent runtime grant checks failed")
+        if json.loads(self.owner_sql(evidence_sql)) != expected:
+            raise BackupError("Runtime grant probes changed the restored data")
+        return owner | {"runtime_role": self.runtime, "sql_grant_probes_rolled_back": True}
 
 
 def restore(config, snapshot, cut, fingerprint, *, provenance, synthetic):
+    if config.get("scope") != "isolated-staging":
+        raise BackupError("The restore configuration must explicitly identify an isolated Staging target")
     if not FINGERPRINT.fullmatch(snapshot) or not FINGERPRINT.fullmatch(fingerprint):
         raise BackupError("Expected a full external snapshot ID and a manifest SHA-256")
     job = verified_job(provenance, cut, snapshot, fingerprint)
     state = private_path(config["state_dir"], directory=True)
     password = private_path(config["password_file"])
     repository = Restic(config["repository"], password)
+    repository_id = job.get("destination_repository_id", "")
+    if not FINGERPRINT.fullmatch(repository_id) or repository.identity() != repository_id:
+        raise BackupError("Configured external repository does not match the verified transfer")
     started = datetime.now(timezone.utc)
     with TemporaryDirectory(prefix="s1-13-restore-", dir=state) as directory:
         bundle, manifest, attachments = verify_bundle(
             repository, snapshot, cut, fingerprint, Path(directory), synthetic,
         )
-        target = Destination(config, synthetic=synthetic)
+        target = Destination(config)
         target.assert_empty(manifest)
         target.install_image(config["app_image"], manifest["image"])
         target.restore_database(bundle / "postgres.dump")
@@ -483,7 +464,9 @@ def restore(config, snapshot, cut, fingerprint, *, provenance, synthetic):
         "image": manifest["image"], "postgres": manifest["postgres"],
         "migrations": manifest["migrations"], "counts": manifest["counts"],
         "control_totals": manifest["control_totals"], "attachment_count": len(attachments),
+        "destination_repository_id": repository_id,
         "roles": roles, "started_at": started.isoformat(), "finished_at": finished.isoformat(),
+        "application_acceptance": "pending", "restore_scope": "isolated-staging",
         "elapsed_seconds": (finished - started).total_seconds(), "synthetic": synthetic,
     }
 

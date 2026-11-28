@@ -61,7 +61,7 @@ class Restic:
 
     def run(self, *args, cwd=None, json_output=False):
         env = os.environ.copy()
-        for key in ("RESTIC_PASSWORD", "RESTIC_PASSWORD_COMMAND"):
+        for key in ("RESTIC_PASSWORD", "RESTIC_PASSWORD_COMMAND", "RESTIC_REPOSITORY_FILE"):
             env.pop(key, None)
         env.update(RESTIC_REPOSITORY=self.repository, RESTIC_PASSWORD_FILE=str(self.password_file))
         command = ["restic", *args]
