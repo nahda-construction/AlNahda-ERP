@@ -367,6 +367,15 @@ def permissions(page, internal, owner, state, actor):
     finally:
         page.set_extra_http_headers({})
 
+    if actor == "a":
+        page.set_extra_http_headers({"X-Forwarded-Host": urlsplit(owner).hostname, "X-Forwarded-Proto": "http"})
+        try:
+            status = page.goto(internal + DOCS, wait_until="domcontentloaded").status
+            assert status == 200, f"Forwarded headers changed the internal route: HTTP {status}"
+            mapping["internal:untrusted-forwarded-headers"] = status
+        finally:
+            page.set_extra_http_headers({})
+
     create_path = create_location(internal, actor)
     prepare_form(page, internal, actor, "S1-12-CSRF-REJECT", 1, attachment_for("S1-12-CSRF"))
     form_token = page.locator("input[name=csrfmiddlewaretoken]").input_value()
@@ -392,7 +401,11 @@ def permissions(page, internal, owner, state, actor):
           form.submit();
         }""", {"target": create_path, "token": form_token})
     foreign = response.value.status
-    evidence(state, f"permissions-{actor}", {"paths": mapping, "no_csrf": missing, "foreign_origin": foreign})
+    observed_origin = response.value.request.header_value("origin")
+    evidence(state, f"permissions-{actor}", {
+        "paths": mapping, "no_csrf": missing, "foreign_origin": foreign, "observed_origin": observed_origin,
+    })
+    assert observed_origin == owner, f"Unexpected cross-origin request: {observed_origin}"
     assert foreign == 403, f"Foreign Origin expected HTTP 403, got {foreign}"
 
 

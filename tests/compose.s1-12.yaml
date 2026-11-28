@@ -19,7 +19,6 @@ x-client: &client
   shm_size: 256m
   volumes:
     - ${ERP_S1_12_ROOT:?Set the private acceptance run path}/nssdb:/run/staging/nssdb:ro
-    - ${ERP_S1_12_ROOT:?Set the private acceptance run path}/evidence:/evidence
   healthcheck:
     test: [CMD-SHELL, 'test -s "$$HOME/.pki/nssdb/cert9.db"']
     interval: 2s

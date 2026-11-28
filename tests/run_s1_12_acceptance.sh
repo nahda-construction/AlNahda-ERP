@@ -75,8 +75,8 @@ verify_config() {
       and (.privileged != true) and (has("pid") | not) and (has("ipc") | not)
       and ((.ports // []) | length) == 0
       and all(.volumes[]?; .type == "volume" or .type == "tmpfs" or
-        (.type == "bind" and
-          ((.source | startswith($root + "/")) or (.source == $template and .read_only == true)))))
+        (.type == "bind" and .read_only == true and
+          ((.source | startswith($root + "/")) or .source == $template))))
   ' >/dev/null
 }
 
@@ -112,7 +112,7 @@ finish() {
   local test_status=$? cleanup_status=0 service ledger_file
   trap - EXIT
   trap '' INT TERM
-  if [[ -n "${S1_12_EVIDENCE_DIR:-}" && -z "${exercise:-}" && -d "$scratch/evidence" ]]; then
+  if [[ -n "${S1_12_EVIDENCE_DIR:-}" && -z "${exercise:-}" && -f "$scratch/cleanup-armed" ]]; then
     if mkdir -p -- "$S1_12_EVIDENCE_DIR"; then
       for ledger_file in a04a-cut a04a-retry a04b-first a04b-retry; do
         if [[ -f "$scratch/$ledger_file.json" ]]; then
@@ -256,7 +256,7 @@ if (($#)); then
 fi
 
 # All input, key and trust material belongs to this invocation.
-mkdir -- "$scratch/tls" "$scratch/nssdb" "$scratch/evidence"
+mkdir -- "$scratch/tls" "$scratch/nssdb"
 ssl="$scratch/tls"
 openssl req -x509 -newkey rsa:2048 -nodes -days 2 -sha256 \
   -subj '/CN=AlNahda S1-12 ephemeral test CA' -addext 'basicConstraints=critical,CA:TRUE' \
@@ -271,7 +271,6 @@ certutil -N --empty-password -d "sql:$scratch/nssdb"
 certutil -A -d "sql:$scratch/nssdb" -n 'AlNahda S1-12 test CA' -t 'C,,' -i "$ssl/ca.crt"
 chmod 0755 "$ssl" "$scratch/nssdb"
 chmod 0644 "$ssl/"*.crt "$scratch/nssdb/"*
-chmod 0777 "$scratch/evidence"
 owned_resources empty
 # Pull/build before starting the isolated project. The office uses preloaded images.
 postgres_ref=postgres:18
@@ -428,6 +427,28 @@ data_flow() {
   probe b cross --peer /tmp/s1-12-state/peer-a.json
 }
 
+printer_assets() {
+  local printer
+  printer=$(compose ps -q printer) || return 1
+  docker inspect "$printer" | jq -e --arg network "${project}_printing" '
+    .[0].NetworkSettings.Networks | keys == [$network]
+  ' >/dev/null || return 1
+  docker network inspect "${project}_printing" | jq -e '.[0].Internal' >/dev/null || return 1
+  compose exec -T printer python - <<'PYTHON'
+import hashlib
+import json
+from apps.printing import renderer, worker
+
+assert worker._assets_ready()
+paths = [worker.ASSETS / "bootstrap.rtl.min.css", worker.ARABIC_FONT]
+print(json.dumps({
+    "renderer_origin": renderer.ORIGIN,
+    "printing_network_internal": True,
+    "local_assets_sha256": {path.name: hashlib.sha256(path.read_bytes()).hexdigest() for path in paths},
+}))
+PYTHON
+}
+
 printing() {
   local locker status=0
   compose exec -T printer python -c '
@@ -452,6 +473,7 @@ with open("/var/lib/erp/print/render.lock", "a+") as lock:
   compose exec -T printer touch /tmp/s112-lock-done || status=$?
   wait "$locker" || status=$?
   ((status == 0)) &&
+  printer_assets &&
   probe a print --expect 200 &&
   probe b print --expect 200 &&
   compose exec -T client-a cat /tmp/s1-12-state/print-a.pdf > "$scratch/print-a.pdf" &&
