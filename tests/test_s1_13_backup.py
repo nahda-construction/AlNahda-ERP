@@ -220,6 +220,21 @@ raise SystemExit(result.returncode)
         self.assertEqual(status["latest_verified_cut_at"], old_cut)
         self.assertTrue(status["rpo_alert"])
 
+    def test_replacing_destination_repository_invalidates_its_rpo_evidence(self):
+        self.init_destination()
+        cut_at = cutoff(1)
+        self.transport("capture", self.bundle("new-repository", cut_at))
+        verified = json.loads(self.transport("transfer").stdout)
+        self.assertEqual(verified["latest_verified_cut_at"], cut_at)
+        self.assertFalse(verified["rpo_alert"])
+
+        self.destination.rename(self.root / "old-external")
+        self.init_destination()
+        replaced_status = self.queue()
+        self.assertIsNone(replaced_status["latest_verified_cut_at"])
+        self.assertTrue(replaced_status["rpo_alert"])
+        self.assertEqual(self.snapshots(self.destination, self.destination_secret, "new-repository"), [])
+
     def test_wrong_manifest_under_existing_destination_tag_is_never_verified(self):
         self.init_destination()
         cut_at = cutoff(1)

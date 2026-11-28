@@ -131,10 +131,12 @@ jobs:
           persist-credentials: false
       - name: Ensure native Restic is available
         run: |
-          if ! command -v restic >/dev/null; then
+          if ! command -v restic >/dev/null || ! command -v pdftotext >/dev/null; then
             sudo apt-get update
-            sudo apt-get install -y --no-install-recommends restic
+            sudo apt-get install -y --no-install-recommends restic poppler-utils
           fi
           restic version
       - name: Verify synthetic backup, transfer and recovery
-        run: python3 -m unittest -v tests.test_s1_13_backup
+        run: python3 -m unittest -v tests.test_s1_13_backup tests.test_s1_13_capture
+      - name: Exercise PostgreSQL and application recovery from the synthetic external copy
+        run: bash tests/run_s1_13_acceptance.sh
