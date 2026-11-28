@@ -244,42 +244,26 @@ def hold_for(page, state, marker):
 
 
 def failed_submit(page, location):
-    from playwright.sync_api import TimeoutError
-
+    status = page.locator("#transaction-save-status")
     predicate = lambda request: is_submission(request, location)
     with page.expect_event("requestfailed", predicate=predicate, timeout=WAIT_MS) as failed:
         page.locator("form button[type=submit]").click(no_wait_after=True)
     request = failed.value
     assert request.failure, "No browser network failure reported"
-    try:
-        page.wait_for_function("""() => {
-          const text = document.body?.innerText || '';
-          return /ERR_|This site can.t be reached|could not be loaded|تعذّر|تعذر/i.test(text);
-        }""", timeout=3_000)
-        error = True
-    except TimeoutError:
-        error = False
+    status.wait_for(state="visible", timeout=3_000)
+    message = status.inner_text()
     return {
         "client_network_error": request.failure,
-        "visible_error": error,
-        "client_message": " ".join(page.locator("body").inner_text().split())[:280] if error else None,
-        "success_page": "/transactions/" in page.url and "/new/" not in page.url,
+        "visible_error": "تعذّر تأكيد الحفظ" in message,
+        "client_message": message,
+        "success_page": page.url != location,
     }
 
 
 def recover_form(page, original, attachment):
-    from playwright.sync_api import Error
-
-    path = "same_document"
-    if form_values(page) is None:
-        path = "browser_history"
-        try:
-            page.go_back(wait_until="domcontentloaded", timeout=12_000)
-        except Error:
-            return {"restoration": path, "title_retained": False, "lines_retained": False, "key_retained": False}
     observed = form_values(page)
     preserved = {
-        "restoration": path,
+        "restoration": "same_document",
         "title_retained": bool(observed and observed["title"] == original["title"]),
         "lines_retained": bool(observed and observed["lines"] == original["lines"]),
         "key_retained": bool(observed and observed["key"] == original["key"]),
@@ -340,6 +324,10 @@ def outage(page, internal, state, phase):
     evidence(state, phase + "-failed", {"title": title, **failure, "route_errors": route_errors})
     if phase == "a04a":
         hold_for(page, state, "a04a-resume")
+    assert page.url == endpoint
+    if phase == "a04a":
+        # Exercise optional file re-selection without restoring any other field.
+        page.locator("#id_attachment").set_input_files([])
     recovered = recover_form(page, before, attachment)
     evidence(state, phase + "-retained", {"title": title, **recovered})
     assert failure["visible_error"] and not failure["success_page"]
@@ -385,6 +373,9 @@ def permissions(page, internal, owner, state, actor):
     missing = response.value.status
     evidence(state, f"csrf-missing-{actor}", {"status": missing})
     assert missing == 403, f"Missing CSRF expected HTTP 403, got {missing}"
+    status = page.locator("#transaction-save-status")
+    status.wait_for(state="visible")
+    assert "رُفض الطلب" in status.inner_text()
 
     # A real same-site cross-origin navigation supplies the browser's Origin header.
     page.goto(owner + LOGIN, wait_until="domcontentloaded")

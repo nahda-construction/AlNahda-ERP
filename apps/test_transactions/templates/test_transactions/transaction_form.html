@@ -25,6 +25,7 @@
         <button type="button" id="add-line" data-max-lines="{{ max_lines }}">إضافة سطر</button>
       </fieldset>
       <button type="submit">حفظ المسودة</button>
+      <p id="transaction-save-status" role="alert" hidden></p>
     </form>
   </main>
   <script>
@@ -41,6 +42,51 @@
       lines.insertAdjacentHTML('beforeend', lineTemplate.innerHTML.replaceAll('__prefix__', index));
       lineCount.value = index + 1;
       addLine.disabled = index + 1 >= maxLines;
+    });
+
+    const transactionForm = addLine.form;
+    const submitButton = transactionForm.querySelector('button[type="submit"]');
+    const saveStatus = document.getElementById('transaction-save-status');
+    const unconfirmedSave = 'تعذّر تأكيد الحفظ. أعد المحاولة بالبيانات نفسها بعد عودة الاتصال. إذا لزم الأمر، اختر المرفق نفسه.';
+    let saving = false;
+
+    transactionForm.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      if (saving) return;
+
+      saving = true;
+      submitButton.disabled = true;
+      saveStatus.textContent = '';
+      saveStatus.hidden = true;
+
+      try {
+        const response = await fetch(transactionForm.action, {
+          method: 'POST',
+          body: new FormData(transactionForm),
+          mode: 'same-origin',
+        });
+
+        if (response.redirected && response.ok) {
+          window.location.assign(response.url);
+          return;
+        }
+
+        if (response.status === 400 || response.status === 409) {
+          const errorPage = new DOMParser().parseFromString(await response.text(), 'text/html');
+          const messages = Array.from(errorPage.querySelectorAll('.errorlist li'), item => item.textContent);
+          saveStatus.textContent = messages.join('، ') || errorPage.body.textContent.trim() || unconfirmedSave;
+        } else if (response.status === 403) {
+          saveStatus.textContent = 'رُفض الطلب. تحقق من الجلسة وصلاحية الحفظ.';
+        } else {
+          saveStatus.textContent = unconfirmedSave;
+        }
+      } catch {
+        saveStatus.textContent = unconfirmedSave;
+      }
+
+      saveStatus.hidden = false;
+      submitButton.disabled = false;
+      saving = false;
     });
   </script>
 </body>
