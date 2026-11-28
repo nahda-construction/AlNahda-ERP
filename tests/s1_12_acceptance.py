@@ -315,6 +315,7 @@ def outage(page, internal, state, phase):
             first.update(status=event.get("responseStatusCode"), location=headers.get("location"))
             evidence(state, "a04b-first", {
                 "title": title, **first, "attachment_sha256": sha256(attachment["buffer"]).hexdigest(),
+                "attachment_name": attachment["name"],
             })
             assert first["status"] == 303 and first["location"]
             hold_for(page, state, "a04b-commit")
@@ -368,29 +369,32 @@ def permissions(page, internal, owner, state, actor):
 
     create_path = create_location(internal, actor)
     prepare_form(page, internal, actor, "S1-12-CSRF-REJECT", 1, attachment_for("S1-12-CSRF"))
-    missing = page.evaluate("""async () => {
-      const input = new FormData(document.querySelector('form'));
-      input.delete('csrfmiddlewaretoken');
-      return (await fetch(location.href, {method: 'POST', body: input})).status;
-    }""")
-    assert missing == 403
+    form_token = page.locator("input[name=csrfmiddlewaretoken]").input_value()
+    page.locator("input[name=csrfmiddlewaretoken]").evaluate("(input) => input.remove()")
+    with page.expect_response(lambda response: is_submission(response.request, create_path)) as response:
+        page.locator("form button[type=submit]").click()
+    missing = response.value.status
+    evidence(state, f"csrf-missing-{actor}", {"status": missing})
+    assert missing == 403, f"Missing CSRF expected HTTP 403, got {missing}"
 
-    def foreign_origin(route):
-        if is_submission(route.request, create_path):
-            route.continue_(headers={**route.request.all_headers(), "origin": owner})
-        else:
-            route.continue_()
-
-    page.route(create_path, foreign_origin)
-    try:
-        foreign = page.evaluate("""async () => {
-          const input = new FormData(document.querySelector('form'));
-          return (await fetch(location.href, {method: 'POST', body: input})).status;
-        }""")
-    finally:
-        page.unroute(create_path, foreign_origin)
-    assert foreign == 403
+    # A real same-site cross-origin navigation supplies the browser's Origin header.
+    page.goto(owner + LOGIN, wait_until="domcontentloaded")
+    with page.expect_response(lambda response: is_submission(response.request, create_path)) as response:
+        page.evaluate("""({target, token}) => {
+          const form = document.createElement('form');
+          form.action = target;
+          form.method = 'POST';
+          const input = document.createElement('input');
+          input.name = 'csrfmiddlewaretoken';
+          input.value = token;
+          form.append(input);
+          document.body.append(form);
+          form.submit();
+        }""", {"target": create_path, "token": form_token})
+    foreign = response.value.status
     evidence(state, f"permissions-{actor}", {"paths": mapping, "no_csrf": missing, "foreign_origin": foreign})
+    assert foreign == 403, f"Foreign Origin expected HTTP 403, got {foreign}"
+
 
 
 def run(args, page, internal, owner):

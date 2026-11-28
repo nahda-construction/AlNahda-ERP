@@ -109,16 +109,21 @@ safe_down() {
 }
 
 finish() {
-  local test_status=$? cleanup_status=0
+  local test_status=$? cleanup_status=0 service ledger_file
   trap - EXIT
   trap '' INT TERM
   if [[ -n "${S1_12_EVIDENCE_DIR:-}" && -z "${exercise:-}" && -d "$scratch/evidence" ]]; then
     if mkdir -p -- "$S1_12_EVIDENCE_DIR"; then
+      for ledger_file in a04a-cut a04a-retry a04b-first a04b-retry; do
+        if [[ -f "$scratch/$ledger_file.json" ]]; then
+          cp -- "$scratch/$ledger_file.json" "$S1_12_EVIDENCE_DIR/$ledger_file-ledger.json" || cleanup_status=1
+        fi
+      done
       for service in a b; do
-        if [[ "$(compose ps -q "client-$service" 2>/dev/null)" ]]; then
+        if compose exec -T "client-$service" test -d /tmp/s1-12-state 2>/dev/null; then
           mkdir -p -- "$S1_12_EVIDENCE_DIR/client-$service" &&
-          compose cp "client-$service:/tmp/s1-12-state/." "$S1_12_EVIDENCE_DIR/client-$service" ||
-            cleanup_status=1
+          compose exec -T "client-$service" tar -C /tmp/s1-12-state -cf - . |
+            tar -xf - -C "$S1_12_EVIDENCE_DIR/client-$service" || cleanup_status=1
         fi
       done
     else
@@ -344,7 +349,10 @@ compose run --rm --no-deps -T -e "S1_12_PASSWORD_A=$S1_12_PASSWORD_A" -e "S1_12_
 compose up -d --no-build --wait web printer proxy client-a client-b outside
 owned_resources owned
 for service in db web printer proxy outside client-a client-b; do
-  [[ -z "$(docker port "$(compose ps -q "$service")")" ]]
+  container=$(compose ps -q "$service")
+  [[ -n "$container" ]]
+  ports=$(docker port "$container")
+  [[ -z "$ports" ]]
 done
 printf 'S1-12: no test container publishes a host port\n'
 
@@ -358,7 +366,8 @@ probe() {
 }
 
 ledger() {
-  local scenario=$1 expected=$2 counts first=
+  local scenario=$1 expected=$2 evidence_name=$3 counts first=''
+  case "$evidence_name" in a04a-cut|a04a-retry|a04b-first|a04b-retry) ;; *) return 2 ;; esac
   case "$scenario" in S1-12-A04a|S1-12-A04b) ;; *) return 2 ;; esac
   counts=$(compose run --rm --no-deps -T migrate python manage.py shell --verbosity 0 \
     -c "from tests.s1_12_acceptance import ledger; ledger('$scenario')") || return 1
@@ -368,10 +377,11 @@ ledger() {
   fi
   jq -e --argjson expected "$expected" --argjson first "${first:-null}" '
     ([.documents, .attachments, .events, .receipts] | all(. == $expected))
-    and ($expected == 0 or (.receipt_state == ["COMPLETED"] and .receipt_status == [303]))
+    and ($expected == 0 or (.receipt_state == ["COMPLETED"] and .receipt_status == [303] and .lines == 2))
     and ($first == null or ($first.status == 303 and .receipt_locations == [$first.location]
-      and .attachment_sha256 == [$first.attachment_sha256]))
-  ' >/dev/null <<<"$counts"
+      and .attachment_sha256 == [$first.attachment_sha256] and .attachment_names == [$first.attachment_name]))
+  ' >/dev/null <<<"$counts" || return 1
+  printf '%s\n' "$counts" > "$scratch/$evidence_name.json"
 }
 
 escape() {
@@ -410,8 +420,8 @@ login_both() { probe a login && probe b login; }
 data_flow() {
   probe a store &&
   probe b store &&
-  compose cp client-a:/tmp/s1-12-state/flow-a.json "$scratch/flow-a.json" &&
-  compose cp client-b:/tmp/s1-12-state/flow-b.json "$scratch/flow-b.json" &&
+  compose exec -T client-a cat /tmp/s1-12-state/flow-a.json > "$scratch/flow-a.json" &&
+  compose exec -T client-b cat /tmp/s1-12-state/flow-b.json > "$scratch/flow-b.json" &&
   compose exec -T client-b sh -c 'cat > /tmp/s1-12-state/peer-a.json' < "$scratch/flow-a.json" &&
   compose exec -T client-a sh -c 'cat > /tmp/s1-12-state/peer-b.json' < "$scratch/flow-b.json" &&
   probe a cross --peer /tmp/s1-12-state/peer-b.json &&
@@ -444,8 +454,8 @@ with open("/var/lib/erp/print/render.lock", "a+") as lock:
   ((status == 0)) &&
   probe a print --expect 200 &&
   probe b print --expect 200 &&
-  compose cp client-a:/tmp/s1-12-state/print-a.pdf "$scratch/print-a.pdf" &&
-  compose cp client-b:/tmp/s1-12-state/print-b.pdf "$scratch/print-b.pdf" &&
+  compose exec -T client-a cat /tmp/s1-12-state/print-a.pdf > "$scratch/print-a.pdf" &&
+  compose exec -T client-b cat /tmp/s1-12-state/print-b.pdf > "$scratch/print-b.pdf" &&
   python3 -m tests.s1_12_acceptance inspect-pdf --actor a --pdf "$scratch/print-a.pdf" &&
   python3 -m tests.s1_12_acceptance inspect-pdf --actor b --pdf "$scratch/print-b.pdf"
 }
@@ -469,7 +479,7 @@ before_save() {
     disconnected=1
     if compose exec -T client-a touch /tmp/s1-12-state/a04a-cut &&
         wait_file client-a /tmp/s1-12-state/a04a-failed.json &&
-        probe b login && ledger S1-12-A04a 0; then
+        probe b login && ledger S1-12-A04a 0 a04a-cut; then
       :
     else
       status=1
@@ -482,7 +492,7 @@ before_save() {
   fi
   compose exec -T client-a touch /tmp/s1-12-state/a04a-resume || status=1
   wait "$browser" || status=$?
-  if ((status == 0)); then ledger S1-12-A04a 1 || status=1; fi
+  if ((status == 0)); then ledger S1-12-A04a 1 a04a-retry || status=1; fi
   return "$status"
 }
 
@@ -491,24 +501,35 @@ after_save() {
   probe a a04b &
   browser=$!
   if wait_file client-a /tmp/s1-12-state/a04b-first.json &&
-      ledger S1-12-A04b 1 &&
+      ledger S1-12-A04b 1 a04b-first &&
       compose exec -T client-a touch /tmp/s1-12-state/a04b-commit; then
     :
   else
     status=1
   fi
   wait "$browser" || status=$?
-  ledger S1-12-A04b 1 || status=1
+  ledger S1-12-A04b 1 a04b-retry || status=1
+  cmp -s "$scratch/a04b-first.json" "$scratch/a04b-retry.json" || status=1
+  if ((status == 0)); then
+    compose exec -T client-a cat /tmp/s1-12-state/a04b-result.json |
+      jq -e --slurpfile db "$scratch/a04b-retry.json" '
+        .reference == $db[0].references[0] and .retry.location == $db[0].receipt_locations[0]
+      ' >/dev/null || status=1
+  fi
   return "$status"
 }
 
 restart_flow() {
-  compose restart db &&
-  compose up -d --no-build --wait db &&
-  compose restart web &&
-  compose up -d --no-build --wait web &&
-  compose restart printer &&
-  compose up -d --no-build --wait printer &&
+  local service container deadline
+  for service in db web printer; do
+    container=$(compose ps -q "$service") || return 1
+    compose restart "$service" || return 1
+    deadline=$((SECONDS+45))
+    until [[ "$(docker inspect --format '{{.State.Health.Status}}' "$container")" == healthy ]]; do
+      ((SECONDS < deadline)) || return 1
+      sleep 1
+    done
+  done
   probe a reopen && probe b reopen && probe a print --expect 200
 }
 
