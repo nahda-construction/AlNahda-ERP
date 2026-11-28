@@ -1,0 +1,8 @@
+[Unit]
+Description=Resume and verify AlNahda S1-13 Staging backup transfers
+
+[Service]
+Type=oneshot
+EnvironmentFile=%h/.config/erp/s1-13-systemd.env
+ExecStart=/usr/bin/python3 ${S1_13_ROOT}/ops/backup/staging.py --config ${S1_13_CONFIG} transfer
+UMask=0077

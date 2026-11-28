@@ -1,0 +1,13 @@
+[Unit]
+Description=Recover an unfinished ERP Staging maintenance window
+After=docker.service
+Before=erp-staging.service
+
+[Service]
+Type=oneshot
+EnvironmentFile=%h/.config/erp/s1-13-systemd.env
+ExecStart=/usr/bin/python3 ${S1_13_ROOT}/ops/backup/capture.py --config ${S1_13_CONFIG} watchdog
+TimeoutStartSec=150s
+
+[Install]
+WantedBy=default.target

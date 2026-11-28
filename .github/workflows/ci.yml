@@ -120,3 +120,23 @@ jobs:
           name: s1-12-browser-evidence
           path: ${{ runner.temp }}/s112-evidence
           if-no-files-found: ignore
+
+  backup-restore:
+    name: S1-13 synthetic backup and restore acceptance
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Ensure native Restic is available
+        run: |
+          if ! command -v restic >/dev/null || ! command -v pdftotext >/dev/null; then
+            sudo apt-get update
+            sudo apt-get install -y --no-install-recommends restic poppler-utils
+          fi
+          restic version
+      - name: Verify synthetic backup, transfer and recovery
+        run: python3 -m unittest -v tests.test_s1_13_backup tests.test_s1_13_capture
+      - name: Exercise PostgreSQL and application recovery from the synthetic external copy
+        run: bash tests/run_s1_13_acceptance.sh
