@@ -29,6 +29,6 @@
 
 اجتازت دفعة S1-10 وS1-11 على `main` بعد الدمج 135 اختبارًا على PostgreSQL 18.7 وفحوص Django والترحيلات والأسرار. في اختبار الطباعة سجّل Docker إنهاءً فعليًا بسبب نفاد الذاكرة عند حد 96 MiB. أعادت الطباعة `503` مع استمرار الويب وPostgreSQL، ثم نجحت عند استعادة حد 1 GiB. [فحص PostgreSQL](https://github.com/nahda-construction/AlNahda-ERP/actions/runs/45943900808/job/140324108623) · [فحص الطباعة وذاكرة الحاوية](https://github.com/nahda-construction/AlNahda-ERP/actions/runs/45943900808/job/140324108879)
 
-تُقدّم دفعة REF-01 وDOC-02 وRTM-01 وVER-01 لضبط المرجعية والتتبع والإصدارات. يظل إعداد S1-12 لتجربة Staging الداخلية عبر LAN تابعًا لها ويُعرض نطاقه للاعتماد قبل التنفيذ.
+أُغلقت دفعة REF-01 وDOC-02 وRTM-01 وVER-01 في نطاقها التوثيقي بعد دمج [#17](https://github.com/nahda-construction/AlNahda-ERP/pull/17) عند `d9b2f083d95a12814980b8263f1fb058fc7afc9d` ونجاح فحص PostgreSQL 18 وقبول طباعة S1-10 عبر cgroups. راجع [سجل الإغلاق](https://github.com/nahda-construction/AlNahda-ERP/pull/17#issuecomment-7227945757) و[سجل القرارات](decisions_ledger.md) للتحفظات. التالية [S1-12 لتجربة Staging الداخلية عبر LAN](reference/s1-12-lan-staging-draft.md)، في مرحلة إعداد التصميم ومراجعته قبل عرض النطاق وإذن التنفيذ.
 
 يسجل DEV-ENV-01 نجاح Docker من Ubuntu ونجاح تجربة إنشاء فرع محلي وحذفه باستخدام `--approve-for-me` وفق تقرير البيئة. أثبت تقرير البيئة السحابية تشغيل Compose وPostgreSQL 18.7 و30 اختباراً؛ تشغيل Docker داخل Codex المحلي ليس شرطاً للمسار السحابي الحالي. راجع [المتابعات](open_blockers.md).
