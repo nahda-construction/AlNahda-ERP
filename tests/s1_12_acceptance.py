@@ -283,6 +283,12 @@ def recover_form(page, original, attachment):
 
 
 def outage(page, internal, state, phase):
+    if phase == "a04b":
+        page.add_init_script("""
+          window.addEventListener('pageshow', event => {
+            window.s112HistoryRestored = event.persisted;
+          });
+        """)
     title = f"S1-12-{phase.upper()[:-1]}{phase[-1]}"
     attachment = attachment_for(title)
     before = prepare_form(page, internal, "a", title, 2, attachment)
@@ -340,10 +346,17 @@ def outage(page, internal, state, phase):
     retry = submit(page, endpoint)
     if phase == "a04b":
         assert retry == first, {"first": first, "retry": retry}
-        page.go_back(wait_until="domcontentloaded")
+        from playwright.sync_api import expect
+
+        page.go_back(wait_until="commit")
         assert page.url == endpoint
-        assert page.locator("form button[type=submit]").is_enabled()
-        evidence(state, "a04b-history", {"returned_to_form": True, "submit_enabled": True})
+        page.wait_for_function("typeof window.s112HistoryRestored === 'boolean'")
+        expect(page.locator("form button[type=submit]")).to_be_enabled()
+        evidence(state, "a04b-history", {
+            "returned_to_form": True,
+            "submit_enabled": True,
+            "bfcache_restored": page.evaluate("window.s112HistoryRestored"),
+        })
     saved = document_info(page, internal, retry["location"], sha256(attachment["buffer"]).hexdigest())
     evidence(state, phase + "-result", {"title": title, "retry": retry, "first": first or None, **saved})
 
