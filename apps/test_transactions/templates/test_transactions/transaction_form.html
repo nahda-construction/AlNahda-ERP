@@ -51,6 +51,12 @@
     const detailPrefix = new URL('../', transactionForm.action).pathname;
     let saving = false;
 
+    window.addEventListener('pageshow', (event) => {
+      if (!event.persisted) return;
+      submitButton.disabled = false;
+      saving = false;
+    });
+
     transactionForm.addEventListener('submit', async (event) => {
       event.preventDefault();
       if (saving) return;
