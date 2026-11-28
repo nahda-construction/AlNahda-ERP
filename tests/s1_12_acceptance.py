@@ -243,10 +243,11 @@ def hold_for(page, state, marker):
     raise AssertionError(f"Missing acceptance control marker {marker}")
 
 
-def failed_submit(page, location):
+def failed_submit(page, location, timeout=WAIT_MS):
     status = page.locator("#transaction-save-status")
     predicate = lambda request: is_submission(request, location)
-    with page.expect_event("requestfailed", predicate=predicate, timeout=WAIT_MS) as failed:
+    started = monotonic()
+    with page.expect_event("requestfailed", predicate=predicate, timeout=timeout) as failed:
         page.locator("form button[type=submit]").click(no_wait_after=True)
     request = failed.value
     assert request.failure, "No browser network failure reported"
@@ -254,6 +255,7 @@ def failed_submit(page, location):
     message = status.inner_text()
     return {
         "client_network_error": request.failure,
+        "elapsed_seconds": round(monotonic() - started, 3),
         "visible_error": "تعذّر تأكيد الحفظ" in message,
         "client_message": message,
         "success_page": page.url != location,
@@ -305,7 +307,6 @@ def outage(page, internal, state, phase):
             hold_for(page, state, "a04b-commit")
         except Exception as error:
             route_errors.append(type(error).__name__)
-        finally:
             cdp.send("Fetch.failRequest", {"requestId": request_id, "errorReason": "ConnectionFailed"})
 
     evidence(state, phase + "-ready", {"title": title, "lines": len(before["lines"])})
@@ -316,7 +317,8 @@ def outage(page, internal, state, phase):
         cdp.on("Fetch.requestPaused", withhold_reply)
         cdp.send("Fetch.enable", {"patterns": [{"urlPattern": endpoint, "requestStage": "Response"}]})
     try:
-        failure = failed_submit(page, endpoint)
+        # In A04b the response stays withheld until the application's own deadline cancels it.
+        failure = failed_submit(page, endpoint, timeout=75_000 if phase == "a04b" else WAIT_MS)
     finally:
         if cdp is not None:
             cdp.send("Fetch.disable")
@@ -332,6 +334,8 @@ def outage(page, internal, state, phase):
     evidence(state, phase + "-retained", {"title": title, **recovered})
     assert failure["visible_error"] and not failure["success_page"]
     assert not route_errors, route_errors
+    if phase == "a04b":
+        assert failure["elapsed_seconds"] >= 59, failure
     assert all(recovered.get(field) for field in ("title_retained", "lines_retained", "key_retained", "file_match")), recovered
     retry = submit(page, endpoint)
     if phase == "a04b":
@@ -399,6 +403,18 @@ def permissions(page, internal, owner, state, actor):
     assert observed_origin == owner, f"Unexpected cross-origin request: {observed_origin}"
     assert foreign == 403, f"Foreign Origin expected HTTP 403, got {foreign}"
 
+    before = prepare_form(
+        page, internal, actor, "S1-12-SESSION-EXPIRED", 1, attachment_for("S1-12-SESSION-EXPIRED"),
+    )
+    page.context.clear_cookies()
+    with page.expect_response(lambda response: is_submission(response.request, create_path)) as response:
+        page.locator("form button[type=submit]").click()
+    assert response.value.status == 302
+    status = page.locator("#transaction-save-status")
+    status.wait_for(state="visible")
+    assert "تحقق من الجلسة" in status.inner_text()
+    assert page.url == create_path and form_values(page) == before
+    evidence(state, f"session-redirect-{actor}", {"status": 302, "draft_retained": True})
 
 
 def run(args, page, internal, owner):
