@@ -1,0 +1,11 @@
+[Unit]
+Description=Watch for cancelled or expired ERP Staging maintenance
+
+[Timer]
+OnBootSec=2s
+OnUnitInactiveSec=5s
+AccuracySec=1s
+Unit=erp-s1-13-recovery.service
+
+[Install]
+WantedBy=timers.target

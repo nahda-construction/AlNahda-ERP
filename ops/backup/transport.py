@@ -73,8 +73,9 @@ class Restic:
             raise BackupError(f"Restic {args[0]} did not complete") from exc
         return result.stdout
 
-    def snapshots(self, tag):
-        return json.loads(self.run("snapshots", "--tag", tag, json_output=True)) or []
+    def snapshots(self, tag=None):
+        arguments = ("--tag", tag) if tag else ()
+        return json.loads(self.run("snapshots", *arguments, json_output=True)) or []
 
     def identity(self):
         return json.loads(self.run("cat", "config"))["id"]
@@ -195,9 +196,16 @@ class Queue:
                 self.finish_capture(data, job)
             return job
 
-    def transfer(self):
+    def destination_identity(self, data):
         if self.destination is None or self.source.repository == self.destination.repository:
             raise BackupError("A separate destination repository is required")
+        identity = self.destination.identity()
+        agreed = data.get("destination_repository_id")
+        if agreed and identity != agreed:
+            raise BackupError("Restic destination changed; existing verified points cannot be carried over")
+        return identity
+
+    def transfer(self):
         errors = 0
         checked_identity = False
         with self.locked() as data:
@@ -211,8 +219,12 @@ class Queue:
                     if job["state"] == "Capturing":
                         self.finish_capture(data, job)
                     if not checked_identity:
-                        if self.source.identity() == self.destination.identity():
+                        destination_id = self.destination_identity(data)
+                        if self.source.identity() == destination_id:
                             raise BackupError("Source and destination resolve to the same Restic repository")
+                        if "destination_repository_id" not in data:
+                            data["destination_repository_id"] = destination_id
+                            self.save(data)
                         checked_identity = True
                     snapshots = self.destination.snapshots(job["tag"])
                     if not snapshots:
@@ -225,7 +237,10 @@ class Queue:
                         raise BackupError("Expected one destination snapshot for the cut")
                     snapshot = snapshots[0]["id"]
                     self.destination.verify(snapshot, job["manifest_sha256"], full=self.synthetic_verify)
-                    job.update(state="Verified", destination_snapshot_id=snapshot, verified_at=now().isoformat())
+                    job.update(
+                        state="Verified", destination_snapshot_id=snapshot,
+                        destination_repository_id=data["destination_repository_id"], verified_at=now().isoformat(),
+                    )
                     job.pop("last_error", None)
                 except (BackupError, OSError) as exc:
                     errors += 1
@@ -234,15 +249,32 @@ class Queue:
                     job["next_attempt_at"] = (now() + timedelta(minutes=delay)).isoformat()
                     job["last_error"] = str(exc) if isinstance(exc, BackupError) else type(exc).__name__
                 self.save(data)
+            if not checked_identity and not errors and data.get("destination_repository_id"):
+                try:
+                    self.destination_identity(data)
+                except (BackupError, OSError):
+                    errors += 1
         return errors
 
     def status(self):
         with self.locked() as data:
-            latest = max(
-                (parse_time(job["cut_at"]) for job in data["jobs"] if job["state"] == "Verified"),
-                default=None,
-            )
+            listing_verified = False
+            latest = None
+            if data.get("destination_repository_id") and self.destination is not None:
+                try:
+                    self.destination_identity(data)
+                    present = {item["id"] for item in self.destination.snapshots()}
+                    listing_verified = True
+                    latest = max(
+                        (parse_time(job["cut_at"]) for job in data["jobs"] if job["state"] == "Verified"
+                         and job["destination_repository_id"] == data["destination_repository_id"]
+                         and job["destination_snapshot_id"] in present),
+                        default=None,
+                    )
+                except (BackupError, OSError):
+                    pass
             return {
+                "destination_listing_verified": listing_verified,
                 "latest_verified_cut_at": latest.isoformat() if latest else None,
                 "rpo_alert": latest is None or now() - latest > timedelta(hours=24),
                 "jobs": [{key: val for key, val in job.items() if key != "bundle"} for job in data["jobs"]],
@@ -263,8 +295,9 @@ def main():
 
     source = Restic(os.environ.get("RESTIC_REPOSITORY"), os.environ.get("RESTIC_PASSWORD_FILE"))
     destination = None
-    if args.command == "transfer":
-        destination = Restic(os.environ.get("S1_13_DEST_REPOSITORY"), os.environ.get("S1_13_DEST_PASSWORD_FILE"))
+    repository = os.environ.get("S1_13_DEST_REPOSITORY")
+    if args.command != "capture" and repository:
+        destination = Restic(repository, os.environ.get("S1_13_DEST_PASSWORD_FILE"))
     queue = Queue(args.state, source, destination, synthetic_verify=args.synthetic_verify)
     if args.command == "capture":
         job = queue.capture(args.bundle)

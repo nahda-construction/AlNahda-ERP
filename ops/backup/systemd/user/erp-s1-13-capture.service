@@ -1,10 +1,10 @@
 [Unit]
 Description=Capture and encrypt AlNahda S1-13 Staging backup
-Requires=alnahda-s1-13-watchdog.timer
-After=alnahda-s1-13-watchdog.timer
+Requires=erp-s1-13-recovery.timer
+After=erp-s1-13-recovery.timer
 
 [Service]
 Type=oneshot
-EnvironmentFile=%h/.config/alnahda/s1-13.env
+EnvironmentFile=%h/.config/erp/s1-13-systemd.env
 ExecStart=/usr/bin/python3 ${S1_13_ROOT}/ops/backup/staging.py --config ${S1_13_CONFIG} capture
 UMask=0077
