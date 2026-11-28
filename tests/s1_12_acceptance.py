@@ -420,18 +420,26 @@ def permissions(page, internal, owner, state, actor):
     assert observed_origin == owner, f"Unexpected cross-origin request: {observed_origin}"
     assert foreign == 403, f"Foreign Origin expected HTTP 403, got {foreign}"
 
-    before = prepare_form(
-        page, internal, actor, "S1-12-SESSION-EXPIRED", 1, attachment_for("S1-12-SESSION-EXPIRED"),
-    )
-    page.context.clear_cookies()
-    with page.expect_response(lambda response: is_submission(response.request, create_path)) as response:
-        page.locator("form button[type=submit]").click()
-    assert response.value.status == 302
-    status = page.locator("#transaction-save-status")
-    status.wait_for(state="visible")
-    assert "تحقق من الجلسة" in status.inner_text()
-    assert page.url == create_path and form_values(page) == before
-    evidence(state, f"session-redirect-{actor}", {"status": 302, "draft_retained": True})
+    # Isolate this case from the preceding cross-origin document navigation.
+    session_page = page.context.new_page()
+    session_page.set_default_timeout(15_000)
+    try:
+        before = prepare_form(
+            session_page, internal, actor, "S1-12-SESSION-EXPIRED", 1,
+            attachment_for("S1-12-SESSION-EXPIRED"),
+        )
+        page.context.clear_cookies(name="sessionid")
+        with session_page.expect_response(lambda response: is_submission(response.request, create_path)) as response:
+            session_page.locator("form button[type=submit]").click()
+        received_status = response.value.status
+        status = session_page.locator("#transaction-save-status")
+        status.wait_for(state="visible")
+        retained = session_page.url == create_path and form_values(session_page) == before
+        evidence(state, f"session-redirect-{actor}", {"status": received_status, "draft_retained": retained})
+        assert received_status == 302
+        assert "تحقق من الجلسة" in status.inner_text() and retained
+    finally:
+        session_page.close()
 
 
 def run(args, page, internal, owner):
